@@ -1,4 +1,14 @@
-"""Library provider for downloading using Python packages."""
+"""Library provider for downloading using Python packages.
+
+DEPRECATED: This provider is deprecated due to security concerns.
+Executing arbitrary Python code from configuration files poses significant
+security risks and is no longer recommended.
+
+For library-based dataset downloads, we recommend:
+1. Installing the library and downloading data separately
+2. Using dedicated providers (HTTP, S3, etc.) for the data
+3. Creating custom provider plugins for specific libraries if needed
+"""
 
 import re
 import subprocess
@@ -11,24 +21,18 @@ from repo2data.providers.base import BaseProvider
 
 class LibraryProvider(BaseProvider):
     """
-    Provider for downloading data using Python library commands.
+    DEPRECATED: Provider for downloading data using Python library commands.
 
-    SECURITY WARNING: This provider executes arbitrary Python code from
-    configuration files. Only use with trusted configurations.
+    This provider is disabled by default due to security concerns.
+    Executing arbitrary Python code from configuration files is a
+    significant security risk.
 
-    Uses Python libraries (e.g., scikit-learn, nilearn) to download datasets.
+    SECURITY WARNING: This provider executes arbitrary Python code.
+    DO NOT use with untrusted configuration files.
     """
 
-    # Whitelist of common safe imports for data downloading
-    SAFE_IMPORTS = {
-        'sklearn', 'scikit-learn',
-        'nilearn',
-        'tensorflow', 'tf',
-        'keras',
-        'torch', 'pytorch',
-        'torchvision',
-        'datasets',  # Hugging Face
-    }
+    # This provider is DISABLED by default for security
+    ENABLED = False
 
     def __init__(self, config: Dict[str, Any], destination: Path):
         """
@@ -42,11 +46,13 @@ class LibraryProvider(BaseProvider):
             Destination directory
         """
         super().__init__(config, destination)
-        self._warn_security_risk()
+        self._show_deprecation_warning()
 
     def can_handle(self, source: str) -> bool:
         """
         Check if source is a Python import command.
+
+        DISABLED: This provider is deprecated for security reasons.
 
         Parameters
         ----------
@@ -56,73 +62,41 @@ class LibraryProvider(BaseProvider):
         Returns
         -------
         bool
-            True if source starts with 'import'
+            False (provider disabled)
         """
+        # Return False to disable this provider by default
+        if not self.ENABLED:
+            return False
+
         return bool(re.match(r".*?(import.*?;).*", source))
 
     @property
     def provider_name(self) -> str:
         """Get provider name."""
-        return "Python Library"
+        return "Python Library (DEPRECATED)"
 
-    def _warn_security_risk(self) -> None:
-        """Warn about security implications of executing arbitrary code."""
+    def _show_deprecation_warning(self) -> None:
+        """Show strong deprecation warning."""
         warnings.warn(
-            "LibraryProvider executes arbitrary Python code from "
-            "configuration files. Only use with trusted sources.",
-            category=SecurityWarning,
+            "\n" + "=" * 70 + "\n"
+            "LibraryProvider is DEPRECATED and disabled by default.\n\n"
+            "SECURITY RISK: This provider executes arbitrary Python code\n"
+            "from configuration files, which poses serious security risks.\n\n"
+            "Recommended alternatives:\n"
+            "1. Install the Python library and download data separately\n"
+            "2. Use HTTP/S3/other providers to download pre-packaged data\n"
+            "3. Create custom provider plugins for specific libraries\n\n"
+            "This provider will be removed in a future version.\n"
+            + "=" * 70,
+            category=DeprecationWarning,
             stacklevel=3
         )
-
-    def _validate_command_safety(self, command: str) -> None:
-        """
-        Perform basic safety validation on command.
-
-        Parameters
-        ----------
-        command : str
-            Python command to validate
-
-        Raises
-        ------
-        ValueError
-            If command contains potentially dangerous patterns
-
-        Warnings
-        --------
-        This is NOT comprehensive security validation. It only catches
-        obvious dangerous patterns.
-        """
-        # Check for dangerous patterns
-        dangerous_patterns = [
-            r'\bos\.system\b',
-            r'\bsubprocess\.',
-            r'\beval\b',
-            r'\bexec\b',
-            r'\b__import__\b',
-            r'\bopen\(',  # File operations outside data downloads
-            r'\brm\b',
-            r'\bdel\b',
-        ]
-
-        for pattern in dangerous_patterns:
-            if re.search(pattern, command):
-                raise ValueError(
-                    f"Command contains potentially dangerous pattern: {pattern}"
-                )
-
-        # Check if imports are from recognized safe libraries
-        import_matches = re.findall(r'\bimport\s+(\w+)', command)
-        for imported_module in import_matches:
-            if imported_module not in self.SAFE_IMPORTS:
-                self.logger.warning(
-                    f"Importing '{imported_module}' which is not in the "
-                    f"safe imports whitelist. Proceed with caution."
-                )
 
     def download(self) -> Path:
         """
         Execute Python library download command.
+
+        DEPRECATED: This method is disabled by default for security.
 
         Returns
         -------
@@ -131,25 +105,37 @@ class LibraryProvider(BaseProvider):
 
         Raises
         ------
-        ValueError
-            If command fails safety validation
-        Exception
-            If execution fails
+        RuntimeError
+            Provider is disabled
         """
+        if not self.ENABLED:
+            raise RuntimeError(
+                "LibraryProvider is disabled for security reasons.\n\n"
+                "Executing arbitrary Python code from configuration files "
+                "is a significant security risk.\n\n"
+                "Please use alternative methods:\n"
+                "1. Install the library and download data separately:\n"
+                "   pip install scikit-learn\n"
+                "   python -c 'from sklearn.datasets import fetch_data; "
+                "fetch_data(data_home=\"./data\")'\n\n"
+                "2. Download pre-packaged data using HTTP/S3 providers\n\n"
+                "3. Create a custom provider for your specific library\n\n"
+                "If you absolutely must use this provider (NOT recommended),\n"
+                "set LibraryProvider.ENABLED = True before importing."
+            )
+
+        # If somehow enabled, show additional warnings
+        self.logger.error(
+            "LibraryProvider is executing arbitrary code - "
+            "this is a serious security risk!"
+        )
+
         self._ensure_destination_exists()
 
         # Prepare command with destination substitution
         command = self.source.replace("_dst", f'"{self.destination}"')
 
-        self.logger.info(f"Executing library download command")
-        self.logger.debug(f"Command: {command}")
-
-        # Basic safety validation
-        try:
-            self._validate_command_safety(command)
-        except ValueError as e:
-            self.logger.error(f"Command failed safety validation: {e}")
-            raise
+        self.logger.warning(f"Executing potentially unsafe command: {command}")
 
         # Execute the Python command
         try:
@@ -172,7 +158,7 @@ class LibraryProvider(BaseProvider):
                 self.logger.debug(f"Command output: {result.stdout}")
 
             self.logger.info(
-                f"Successfully executed library download to {self.destination}"
+                f"Library download completed (NOT RECOMMENDED)"
             )
             return self.destination
 

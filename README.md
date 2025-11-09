@@ -1,266 +1,410 @@
-[![CircleCI](https://circleci.com/gh/SIMEXP/Repo2Data.svg?style=svg)](https://circleci.com/gh/SIMEXP/Repo2Data) ![](https://img.shields.io/pypi/v/repo2data?style=flat&logo=python&logoColor=white&logoSize=8&labelColor=rgb(255%2C0%2C0)&color=white) [![Python 3.6](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/release/python-360/) ![GitHub](https://img.shields.io/github/license/SIMEXP/repo2data)
+[![CircleCI](https://circleci.com/gh/SIMEXP/Repo2Data.svg?style=svg)](https://circleci.com/gh/SIMEXP/Repo2Data) ![](https://img.shields.io/pypi/v/repo2data?style=flat&logo=python&logoColor=white&logoSize=8&labelColor=rgb(255%2C0%2C0)&color=white) [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/release/python-370/) ![GitHub](https://img.shields.io/github/license/SIMEXP/repo2data)
+
 # Repo2Data
-Repo2Data is a **python3** package that automatically fetches data from a remote server, and decompresses it if needed. Supported web data sources are [amazon s3](https://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html), [datalad](https://www.datalad.org/), [osf](https://osf.io/), [Google drive](https://www.google.com/intl/en_ca/drive/), raw http(s) or specific python lib datasets (`sklearn.datasets.load`, `nilearn.datasets.fetch` etc...).
- 
-## Input
- 
-A `data_requirement.json` configuration file explaining what should be read, where should you store the data, and a project name (name of the folder where file will be downloaded).
 
-```
-{ "src": "https://github.com/SIMEXP/Repo2Data/archive/master.zip",
-  "dst": "./data",
-  "projectName": "repo2data_out"}
-```
-`src` is where you configure the upstream location for your data.
+Repo2Data is a **Python 3.7+** package that automatically fetches data from remote sources with intelligent caching and automatic decompression.
 
-`dst` specifies where (which folder) the data should be downloaded.
+## ✨ New in Version 3.0
 
-`projectName` is the name of the directory where the data will be saved, such that you can access it at `{dst}/{projectName}`
+**Major refactoring with improved architecture:**
+- 🎯 **Modular plugin-based architecture** - Easy to extend with new data sources
+- 📝 **YAML support** - Use YAML configuration files in addition to JSON
+- 🔒 **Enhanced security** - Better validation and deprecated unsafe features
+- ⚡ **Sophisticated caching** - Content-based cache validation
+- 📊 **Better logging** - Proper logging framework with configurable levels
+- 🔄 **Backwards compatible** - Existing code continues to work
 
-## Output
+## Supported Data Sources
 
-The content of the server inside the specified folder.
+- 🌐 **HTTP/HTTPS** - Any publicly accessible URL
+- 📦 **AWS S3** - Amazon S3 buckets (via AWS CLI)
+- 🔬 **Datalad** - Git-annex datasets
+- 🎓 **Zenodo** - Academic datasets via DOI
+- 🔓 **OSF** - Open Science Framework projects
+- 💾 **Google Drive** - Public Google Drive files
 
-## Execution
+## Installation
 
-The tool can be executed through `bash` or imported as a python API.
+### Using pip
 
-#### Bash
-
-If `data_requirement.json` is inside current directory, you can call the following on the command line:
-
-```
-repo2data
+```bash
+pip install repo2data
 ```
 
-#### Python API
+For Datalad support, you'll need [git-annex](https://git-annex.branchable.com/install/):
 
-After defining the `data_requirement.json` and importing the module, first instanciate the `Repo2Data` object with:
+```bash
+# Debian/Ubuntu
+sudo apt-get install git-annex
 
-```
-from repo2data.repo2data import Repo2Data
-
-# define data requirement path
-data_req_path = os.path.join("data_requirement.json")
-# download data
-repo2data = Repo2Data(data_req_path)
+# macOS
+brew install git-annex
 ```
 
-You can then fetch the data with the `install` method, which returns a list to the output directory(ies) where the data was downloaded:
-```
-data_path = repo2data.install()
-```
+### Using Docker (Recommended)
 
-## Examples of data_requirement.json
+The Docker image includes all dependencies:
 
-###### archive file
-
-Repo2Data will use `wget` if it detects a http link.
-If this file is an archive, it will be automatically be decompressed using [patool](https://github.com/wummel/patool). Please unsure that you download the right package to unarchive the data (ex: `/usr/bin/tar` for `.tar.gz`).
-
-```
-{ "src": "https://github.com/SIMEXP/Repo2Data/archive/master.tar.gz",
-  "dst": "./data",
-  "projectName": "repo2data_wget"}
+```bash
+git clone https://github.com/SIMEXP/Repo2Data
+docker build --tag repo2data ./Repo2Data/
 ```
 
-###### Google Drive
+## Quick Start
 
-It can also download a file from [Google Drive](https://www.google.com/intl/en_ca/drive/) using [gdown](https://github.com/wkentaro/gdown).
-You will need to make sure that your file is available **publically**, and get the project ID (a chain of 33 characters that you can find on the url).
-Then you can construct the url with this ID:
-`https://drive.google.com/uc?id=${PROJECT_ID}`
+### 1. Create a configuration file
 
-For example:
-```
-{ "src": "https://drive.google.com/uc?id=1_zeJqQP8umrTk-evSAt3wCLxAkTKo0lC",
-  "dst": "./data",
-  "projectName": "repo2data_gdrive"}
-```
-
-###### library data-package
-
-You will need to put the script to import and download the data in the `src` field, the lib should be installed on the host machine.
-
-Any lib function to fetch data needs a parameter so it know where is the output directory. To avoid dupplication of the destination parameter, please replace the parameter for the output dir in the function by `_dst`.
-
-For example write `tf.keras.datasets.mnist.load_data(path=_dst)` instead of `tf.keras.datasets.mnist.load_data(path=/path/to/your/data)`.
-Repo2Data will then automatically replace `_dst` by the one provided in the `dst` field.
-
-```
-{ "src": "import tensroflow as tf; tf.keras.datasets.mnist.load_data(path=_dst)",
-  "dst": "./data",
-  "projectName": "repo2data_lib"}
-```
-
-###### datalad
-
-The `src` should be point to a `.git` link if using `datalad`, `Repo2Data` will then just call `datalad get`.
-
-```
-{ "src": "https://github.com/OpenNeuroDatasets/ds000005.git",
-  "dst": "./data",
-  "projectName": "repo2data_datalad"}
-```
-
-###### s3
-
-To download an amazon s3 link, `Repo2Data` uses `aws s3 sync --no-sign-request` command. So you should provide the `s3://` bucket link of the data:
-
-```
-{ "src": "s3://openneuro.org/ds000005",
-  "dst": "./data",
-  "projectName": "repo2data_s3"}
-```
-
-###### osf
-
-`Repo2Data` uses [osfclient](https://github.com/osfclient/osfclient) `osf -p PROJECT_ID clone` command. You will need to give the link to the **public** project containing your data `https://osf.io/.../`:
-
-```
-{ "src": "https://osf.io/fuqsk/",
-  "dst": "./data",
-  "projectName": "repo2data_osf"}
-```
-
-If you need to download a single file, or a list of files, you can do this using the `remote_filepath` field wich runs `osf -p PROJECT_ID fetch -f file`. For example to download two files (https://osf.io/aevrb/ and https://osf.io/bvuh6/), use a relative path to the root of the project:
-
-```
-{ "src": "https://osf.io/fuqsk/",
-  "remote_filepath": ["hello.txt", "test-subfolder/hello-from-subfolder.txt"],
-  "dst": "./data",
-  "projectName": "repo2data_osf_multiple"}
-```
-
-###### zenodo
-
-The public data repository [zenodo](https://zenodo.org/) is also supported using [zenodo_get](https://gitlab.com/dvolgyes/zenodo_get). Make sure your project is public and it has a DOI with the form `10.5281/zenodo.XXXXXXX`:
-
-```
-{ "src": "10.5281/zenodo.6482995",
-  "dst": "./data",
-  "projectName": "repo2data_zenodo"}
-```
-
-###### multiple data
-
-If you need to download many data at once, you can create a list of json. For example, to download different files from a repo :
-
-```
+**JSON format** (`data_requirement.json`):
+```json
 {
-  "authors": {
-    "src": "https://github.com/tensorflow/tensorflow/blob/master/AUTHORS",
+  "src": "https://github.com/SIMEXP/Repo2Data/archive/master.tar.gz",
+  "dst": "./data",
+  "projectName": "my_dataset"
+}
+```
+
+**YAML format** (`data_requirement.yaml`):
+```yaml
+data:
+  src: "https://github.com/SIMEXP/Repo2Data/archive/master.tar.gz"
+  dst: "./data"
+  projectName: "my_dataset"
+```
+
+### 2. Download the data
+
+**Command line:**
+```bash
+# Uses data_requirement.json in current directory
+repo2data
+
+# Specify a different file
+repo2data -r path/to/config.yaml
+
+# Enable debug logging
+repo2data -r config.yaml --log-level DEBUG
+```
+
+**Python API (New):**
+```python
+from repo2data import DatasetManager
+
+# Initialize manager
+manager = DatasetManager("data_requirement.yaml")
+
+# Download datasets
+paths = manager.install()
+print(f"Data downloaded to: {paths}")
+```
+
+**Python API (Legacy - still works):**
+```python
+from repo2data import Repo2Data
+
+repo2data = Repo2Data("data_requirement.json")
+paths = repo2data.install()
+```
+
+## Configuration Reference
+
+### Required Fields
+
+- `src` - Source URL or command
+- `projectName` - Name of the output directory
+
+### Optional Fields
+
+- `dst` - Destination directory (default: `./data`)
+- `version` - Version string for cache invalidation
+- `dataLayout` - Special layout handling (e.g., `"neurolibre"`)
+- `remote_filepath` - Specific files to download (OSF only)
+
+## Examples
+
+### HTTP Archive Download
+
+```json
+{
+  "src": "https://example.com/data.tar.gz",
+  "dst": "./data",
+  "projectName": "archive_data"
+}
+```
+
+The archive will be automatically extracted and the `.tar.gz` file removed.
+
+### Google Drive
+
+Make your file **publicly accessible** and get the file ID from the URL:
+
+```json
+{
+  "src": "https://drive.google.com/uc?id=YOUR_FILE_ID",
+  "dst": "./data",
+  "projectName": "gdrive_data"
+}
+```
+
+### Datalad / Git-annex
+
+```json
+{
+  "src": "https://github.com/OpenNeuroDatasets/ds000005.git",
+  "dst": "./data",
+  "projectName": "openneuro_dataset"
+}
+```
+
+### AWS S3
+
+```json
+{
+  "src": "s3://openneuro.org/ds000005",
+  "dst": "./data",
+  "projectName": "s3_dataset"
+}
+```
+
+### Zenodo
+
+Use the DOI from your Zenodo dataset:
+
+```json
+{
+  "src": "10.5281/zenodo.6482995",
+  "dst": "./data",
+  "projectName": "zenodo_data"
+}
+```
+
+### OSF (Open Science Framework)
+
+**Download entire project:**
+```json
+{
+  "src": "https://osf.io/fuqsk/",
+  "dst": "./data",
+  "projectName": "osf_project"
+}
+```
+
+**Download specific files:**
+```json
+{
+  "src": "https://osf.io/fuqsk/",
+  "remote_filepath": ["file1.txt", "subfolder/file2.txt"],
+  "dst": "./data",
+  "projectName": "osf_files"
+}
+```
+
+### Multiple Downloads
+
+**JSON format:**
+```json
+{
+  "dataset1": {
+    "src": "https://example.com/data1.zip",
     "dst": "./data",
-    "projectName": "repo2data_multiple1"
+    "projectName": "data1"
   },
-  "license": {
-    "src": "https://github.com/tensorflow/tensorflow/blob/master/LICENSE",
+  "dataset2": {
+    "src": "s3://bucket/data2",
     "dst": "./data",
-    "projectName": "repo2data_multiple2"
+    "projectName": "data2"
   }
 }
 ```
-## Install
 
-### Docker (recommended)
+**YAML format:**
+```yaml
+data:
+  dataset1:
+    src: "https://example.com/data1.zip"
+    dst: "./data"
+    projectName: "data1"
 
-This is the recommended way of using `Repo2Data`, because it encapsulate all the dependencies inside the container. It also features `scikit-learn` and `nilearn` to pull data from.
-
-Clone this repo and build the docker image yourself :
-```
-git clone https://github.com/SIMEXP/Repo2Data
-sudo docker build --tag repo2data ./Repo2Data/
-```
-
-### pip
-
-To install `Datalad` you will need the latest version of [git-annex](https://git-annex.branchable.com/install/), please use the [package from neuro-debian](https://git-annex.branchable.com/install/) :
-```
-wget -O- http://neuro.debian.net/lists/stretch.us-nh.full | sudo tee /etc/apt/sources.list.d/neurodebian.sources.list
-sudo apt-key adv --recv-keys --keyserver hkp://ipv4.pool.sks-keyservers.net:80 0xA5D32F012649A5A9
-```
-If you have troubles to download the key, please look at this [issue](https://github.com/jacobalberty/unifi-docker/issues/64).
-
-You can now install with `pip`:
-```
-python3 -m pip install repo2data
+  dataset2:
+    src: "s3://bucket/data2"
+    dst: "./data"
+    projectName: "data2"
 ```
 
-## Usage
+## Advanced Usage
 
-After creating the `data_requirement.json`, just use `repo2data` without any option:
-```
-repo2data
-```
+### Cache Management
 
-### requirement in another directory
+Repo2Data uses intelligent caching - data is only re-downloaded if critical fields change:
 
-If the `data_requirement.json` is in another directory, use the `-r` option:
-```
-repo2data -r /PATH/TO/data_requirement.json
-```
+```python
+from repo2data import DatasetDownloader
 
-### github repo url as input
+downloader = DatasetDownloader(config)
 
-Given a valid https github repository with a `data_requirement.json` at `HEAD` branch (under a `binder` directory or at its root), you can do:
-```
-repo2data -r GITHUB_REPO
-```
+# Check if cached
+if downloader.is_cached():
+    print("Data already downloaded!")
+else:
+    downloader.download()
 
-An example of a valid `GITHUB_REPO` is: https://github.com/ltetrel/repo2data-caching-s3
-
-### Trigger re-fetch
-
-When you re-run Repo2Data with the same destination, it will automatically look for an existing `data_requirement.json` file in the downloaded folder.
-If the configured `data_requirement.json` is the same (i.e. the [JSON dict](https://www.w3schools.com/python/python_json.asp) has the same fields) then it will not re-download.
-
-To force the re-fetch (update existing files, add new files but keep the old files), you can add a new field or update an existing one in the `data_requirement.json`.
-For example replace:
-```
-{ "src": "https://github.com/SIMEXP/Repo2Data/archive/master.zip",
-  "dst": "./data",
-  "projectName": "repo2data_out"}
-```
-by 
-```
-{ "src": "https://github.com/SIMEXP/Repo2Data/archive/master.zip",
-  "dst": "./data",
-  "projectName": "repo2data_out",
-  "version": "1.1"}
-```
-This is especially usefull when the provenance link always stay the same (osf, google drive...).
-
-### make `dst` field optionnal
-
-##### using `dataLayout` field
-In the case you have a fixed known layout for the data folder within a github repository, the `dst` field is not needed anymore.
-To define what kind of layout you want, you can use the `dataLayout` field.
-For now we just support the [neurolibre layout](https://docs.neurolibre.org/en/latest/SUBMISSION_STRUCTURE.html#preprint-repository-structure):
-```
-{ "src": "https://github.com/SIMEXP/Repo2Data/archive/master.zip",
-  "dataLayout": "neurolibre"}
-```
-If you need another data layout (like [YODA](https://f1000research.com/posters/7-1965) or [cookiecutter-data-science](https://drivendata.github.io/cookiecutter-data-science/)) you can create a feature request.
-
-##### for administrator
-You can disable the field `dst` by using the option
-`repo2data --server`
-
-In this case `Repo2Data` will put the data inside the folder `./data` from where it is run. This is usefull if you want to have full control over the destination (you are a server admin and don't want your users to control the destination).
-
-### Docker
-
-You will need to create a folder on your machine (containing a `data_requirement.json`) that the Docker container will access so `Repo2Data` can pull the data inside it, after you can use:
-```
-sudo docker run -v /PATH/TO/FOLDER:/data repo2data
+# Force re-download
+downloader.invalidate_cache()
+downloader.download()
 ```
 
-(the container will run with `--server` enabled, so all the data in the container will be at `/data`)
+### Custom Logging
 
-A requirement from a github repo is also supported (so you don't need any `data_requirement.json` inside your host folder):
+```python
+from repo2data import setup_logger, DatasetManager
+import logging
+
+# Setup custom logging
+setup_logger(
+    level=logging.DEBUG,
+    log_file="repo2data.log"
+)
+
+manager = DatasetManager("config.yaml")
+manager.install()
 ```
-sudo docker run -v /PATH/TO/FOLDER:/data repo2data -r GITHUB_REPO
+
+### Programmatic Provider Selection
+
+```python
+from repo2data.providers import registry
+
+# List available providers
+providers = registry.list_providers()
+print(f"Available: {providers}")
+
+# Get provider for specific source
+from pathlib import Path
+provider = registry.get_provider(
+    source="s3://bucket/data",
+    config={"src": "s3://bucket/data", "projectName": "test"},
+    destination=Path("./data")
+)
+print(f"Selected: {provider.provider_name}")
 ```
 
-`Docker` mounts the host (your machine) folder into the container folder as `-v host_folder:container_folder`, so don't override `:/data`.
+## Architecture
 
+Repo2Data 3.0 features a modular architecture:
+
+```
+repo2data/
+├── config/          # Configuration loading (JSON/YAML)
+├── providers/       # Pluggable data source providers
+│   ├── http.py      # HTTP/HTTPS downloads
+│   ├── gdrive.py    # Google Drive
+│   ├── s3.py        # AWS S3
+│   ├── datalad.py   # Git-annex
+│   ├── zenodo.py    # Zenodo DOI
+│   └── osf.py       # OSF
+├── cache/           # Intelligent caching system
+├── utils/           # Logging, decompression, validation
+├── manager.py       # Main orchestrator
+└── downloader.py    # Download executor
+```
+
+## Security Notes
+
+⚠️ **LibraryProvider Deprecated**: The Python library execution feature has been deprecated due to security concerns (arbitrary code execution). Use dedicated providers or install libraries separately.
+
+## Migration from 2.x
+
+Version 3.0 is fully backwards compatible. Old code continues to work with deprecation warnings:
+
+**Old API (still works):**
+```python
+from repo2data.repo2data import Repo2Data
+repo2data = Repo2Data("data_requirement.json")
+```
+
+**New API (recommended):**
+```python
+from repo2data import DatasetManager
+manager = DatasetManager("data_requirement.json")
+```
+
+## CLI Reference
+
+```bash
+repo2data [OPTIONS]
+
+Options:
+  -r, --requirement PATH      Path to config file or GitHub URL
+  --server                    Enable server mode (force destination)
+  --destination DIR           Destination for server mode (default: ./data)
+  -l, --log-level LEVEL       Logging level (DEBUG|INFO|WARNING|ERROR|CRITICAL)
+  --log-file FILE             Write logs to file
+  -v, --version               Show version
+  -h, --help                  Show help message
+```
+
+## Examples
+
+See the [`examples/`](examples/) directory for more examples in both JSON and YAML formats.
+
+## Development
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+### Adding a New Provider
+
+1. Create a new provider class inheriting from `BaseProvider`
+2. Implement `can_handle()`, `download()`, and `provider_name`
+3. Register it in `repo2data/downloader.py`
+
+Example:
+```python
+from repo2data.providers.base import BaseProvider
+
+class MyProvider(BaseProvider):
+    def can_handle(self, source: str) -> bool:
+        return source.startswith("myprovider://")
+
+    def download(self) -> Path:
+        # Download logic here
+        return self.destination
+
+    @property
+    def provider_name(self) -> str:
+        return "My Provider"
+```
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new features
+4. Ensure all tests pass
+5. Submit a pull request
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Citation
+
+If you use Repo2Data in your research, please cite:
+
+```bibtex
+@software{repo2data,
+  title = {Repo2Data: Automated Data Fetching with Caching},
+  author = {Tetrel, L. and Karakuzu, A.},
+  url = {https://github.com/SIMEXP/Repo2Data},
+  year = {2024}
+}
+```
+
+## Support
+
+- Documentation: [https://github.com/SIMEXP/Repo2Data](https://github.com/SIMEXP/Repo2Data)
+- Issues: [https://github.com/SIMEXP/Repo2Data/issues](https://github.com/SIMEXP/Repo2Data/issues)
+- Discussions: [https://github.com/SIMEXP/Repo2Data/discussions](https://github.com/SIMEXP/Repo2Data/discussions)

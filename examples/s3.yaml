@@ -1,0 +1,7 @@
+# Example: Download from AWS S3
+# YAML format
+
+data:
+  src: "s3://openneuro.org/ds000005"
+  dst: "./"
+  projectName: "ds000005"
