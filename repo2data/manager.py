@@ -1,0 +1,229 @@
+"""Dataset manager for orchestrating downloads."""
+
+import os
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+import logging
+
+from repo2data.config.loader import ConfigLoader
+from repo2data.config.validator import ConfigValidator
+from repo2data.downloader import DatasetDownloader
+from repo2data.utils.logger import get_logger
+
+logger = logging.getLogger(__name__)
+
+
+class DatasetManager:
+    """
+    Manages dataset downloads from requirement files.
+
+    Orchestrates loading configuration, validating it, and coordinating
+    multiple downloads. Replaces the old Repo2Data class.
+    """
+
+    def __init__(
+        self,
+        requirement_path: Optional[str] = None,
+        server_mode: bool = False,
+        server_destination: str = "./data"
+    ):
+        """
+        Initialize DatasetManager.
+
+        Parameters
+        ----------
+        requirement_path : str, optional
+            Path to requirement file (JSON/YAML) or GitHub URL.
+            Defaults to './data_requirement.json'
+        server_mode : bool
+            If True, force all downloads to server_destination
+        server_destination : str
+            Destination directory when in server mode
+        """
+        self.requirement_path = requirement_path
+        self.server_mode = server_mode
+        self.server_destination = server_destination
+        self.logger = get_logger(__name__)
+
+        # Load and validate configuration
+        self.config_loader = ConfigLoader(requirement_path)
+        self.config_validator = ConfigValidator()
+        self.requirements: Optional[Dict[str, Any]] = None
+
+    def load_requirements(self) -> Dict[str, Any]:
+        """
+        Load and validate requirements.
+
+        Returns
+        -------
+        dict
+            Loaded requirements
+
+        Raises
+        ------
+        ValueError
+            If requirements are invalid
+        """
+        self.logger.info("Loading requirements...")
+
+        # Load configuration
+        self.requirements = self.config_loader.load()
+
+        # Validate configuration
+        try:
+            self.config_validator.validate(self.requirements)
+            self.logger.info("Requirements validated successfully")
+        except ValueError as e:
+            self.logger.error(f"Invalid requirements: {e}")
+            raise
+
+        return self.requirements
+
+    def install(self) -> List[str]:
+        """
+        Install all datasets defined in requirements.
+
+        Returns
+        -------
+        list of str
+            Paths to installed datasets
+
+        Examples
+        --------
+        >>> manager = DatasetManager("data_requirement.json")
+        >>> paths = manager.install()
+        >>> print(paths)
+        ['./data/dataset1', './data/dataset2']
+        """
+        self.logger.info("=" * 60)
+        self.logger.info("repo2data starting")
+        self.logger.info("=" * 60)
+        self.logger.info(f"Configuration: {self.config_loader.config_path}")
+        self.logger.info(f"Server mode: {self.server_mode}")
+
+        # Load requirements if not already loaded
+        if self.requirements is None:
+            self.load_requirements()
+
+        # Parse and execute downloads
+        downloads = self._parse_requirements()
+        results = []
+
+        self.logger.info(f"Found {len(downloads)} download(s) to process")
+
+        for download_key, config in downloads.items():
+            self.logger.info("-" * 60)
+            if download_key:
+                self.logger.info(f"Processing download: {download_key}")
+
+            try:
+                downloader = DatasetDownloader(
+                    config=config,
+                    server_mode=self.server_mode,
+                    server_destination=self.server_destination,
+                    requirement_path=self.config_loader.config_path,
+                    download_key=download_key
+                )
+
+                result_path = downloader.download()
+                results.append(result_path)
+
+                self.logger.info(f"✓ Download complete: {result_path}")
+
+            except Exception as e:
+                self.logger.error(
+                    f"✗ Download failed for {download_key or 'config'}: {e}"
+                )
+                # Continue with other downloads
+                continue
+
+        self.logger.info("=" * 60)
+        self.logger.info(
+            f"repo2data complete: {len(results)}/{len(downloads)} successful"
+        )
+        self.logger.info("=" * 60)
+
+        return results
+
+    def _parse_requirements(self) -> Dict[Optional[str], Dict[str, Any]]:
+        """
+        Parse requirements into individual download configurations.
+
+        Returns
+        -------
+        dict
+            Dictionary mapping download keys to configurations.
+            For single downloads, key is None.
+
+        Examples
+        --------
+        Single download:
+        {None: {"src": "...", "projectName": "..."}}
+
+        Multiple downloads:
+        {"dataset1": {"src": "...", "projectName": "..."},
+         "dataset2": {"src": "...", "projectName": "..."}}
+        """
+        if not self.requirements:
+            raise ValueError("Requirements not loaded")
+
+        # Detect single vs multi-download
+        first_key = next(iter(self.requirements))
+        first_value = self.requirements[first_key]
+
+        if isinstance(first_value, dict):
+            # Multi-download configuration
+            self.logger.debug("Detected multi-download configuration")
+            downloads = {}
+            for key, value in self.requirements.items():
+                if isinstance(value, dict):
+                    downloads[key] = value
+            return downloads
+        else:
+            # Single download configuration
+            self.logger.debug("Detected single download configuration")
+            return {None: self.requirements}
+
+    def get_download_info(self) -> Dict[str, Any]:
+        """
+        Get information about configured downloads.
+
+        Returns
+        -------
+        dict
+            Information about downloads
+
+        Examples
+        --------
+        >>> manager = DatasetManager("data_requirement.json")
+        >>> info = manager.get_download_info()
+        >>> print(info['count'])
+        2
+        """
+        if self.requirements is None:
+            self.load_requirements()
+
+        downloads = self._parse_requirements()
+
+        info = {
+            "count": len(downloads),
+            "downloads": {}
+        }
+
+        for key, config in downloads.items():
+            download_key = key or "default"
+            info["downloads"][download_key] = {
+                "source": config.get("src", ""),
+                "project": config.get("projectName", ""),
+                "destination": config.get("dst", "")
+            }
+
+        return info
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return (
+            f"DatasetManager("
+            f"requirement_path={self.requirement_path}, "
+            f"server_mode={self.server_mode})"
+        )

@@ -25,9 +25,10 @@ dependencies = [
     'datalad',
     'requests',
     'osfclient',
-    'gdown',
+    'gdown>=4.6.0',
     'zenodo-get',
-    'requests'
+    'pyyaml>=6.0',
+    'jsonschema>=4.0',
 ]
 
 [project.scripts]
