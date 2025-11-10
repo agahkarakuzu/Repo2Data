@@ -38,6 +38,9 @@ repo2data = "repo2data.cli:main"
 [project.urls]
 Homepage = "https://github.com/SIMEXP/Repo2Data"
 
+[tool.setuptools]
+packages = { find = { where = ["."], include = ["repo2data*"], exclude = ["data*", "tests*"] } }
+
 [tool.setuptools_scm]
 version_scheme = "post-release"
 local_scheme = "dirty-tag"
