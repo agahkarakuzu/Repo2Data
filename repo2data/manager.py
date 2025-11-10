@@ -8,6 +8,7 @@ import logging
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.tree import Tree
 
 from repo2data.config.loader import ConfigLoader
 from repo2data.config.validator import ConfigValidator
@@ -15,6 +16,60 @@ from repo2data.downloader import DatasetDownloader
 from repo2data.utils.logger import get_logger, console
 
 logger = logging.getLogger(__name__)
+
+
+def _get_directory_size(path: Path) -> int:
+    """Calculate total size of directory in bytes."""
+    total = 0
+    try:
+        for entry in path.rglob('*'):
+            if entry.is_file():
+                total += entry.stat().st_size
+    except Exception:
+        pass
+    return total
+
+
+def _format_size(size_bytes: int) -> str:
+    """Format bytes to human-readable size."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} PB"
+
+
+def _build_directory_tree(path: Path, max_depth: int = 2, max_files: int = 10) -> Tree:
+    """Build a rich Tree showing directory structure."""
+    tree = Tree(f"[bold cyan]{path.name}/[/bold cyan]")
+
+    def add_children(parent_tree: Tree, parent_path: Path, current_depth: int):
+        if current_depth >= max_depth:
+            return
+
+        try:
+            items = sorted(parent_path.iterdir(), key=lambda x: (not x.is_dir(), x.name))
+            file_count = 0
+
+            for item in items:
+                if item.is_dir():
+                    subtree = parent_tree.add(f"[cyan]{item.name}/[/cyan]")
+                    add_children(subtree, item, current_depth + 1)
+                else:
+                    if file_count < max_files:
+                        size = item.stat().st_size
+                        parent_tree.add(f"[dim]{item.name}[/dim] [yellow]({_format_size(size)})[/yellow]")
+                        file_count += 1
+
+            if file_count == max_files and len([x for x in items if x.is_file()]) > max_files:
+                remaining = len([x for x in items if x.is_file()]) - max_files
+                parent_tree.add(f"[dim]... and {remaining} more file(s)[/dim]")
+
+        except PermissionError:
+            pass
+
+    add_children(tree, path, 0)
+    return tree
 
 
 class DatasetManager:
@@ -157,13 +212,32 @@ class DatasetManager:
                 # Continue with other downloads
                 continue
 
-        # Show summary
+        # Show summary with details
         console.print()
         if results:
-            console.print(Panel.fit(
-                f"[bold green]✓ {len(results)}/{len(downloads)} dataset(s) downloaded[/bold green]",
-                border_style="green"
-            ))
+            # Calculate total size
+            total_size = sum(_get_directory_size(Path(p)) for p in results)
+
+            # Build summary panel
+            summary = f"[bold green]✓ {len(results)}/{len(downloads)} dataset(s) downloaded[/bold green]\n"
+            summary += f"[dim]Total size:[/dim] {_format_size(total_size)}\n"
+
+            if len(results) == 1:
+                summary += f"[dim]Location:[/dim] {results[0]}"
+            else:
+                summary += f"[dim]Locations:[/dim]\n"
+                for result_path in results:
+                    summary += f"  • {result_path}\n"
+
+            console.print(Panel(summary.rstrip(), border_style="green", title="Summary"))
+
+            # Show directory tree for each download
+            for result_path in results:
+                path = Path(result_path)
+                if path.exists():
+                    console.print()
+                    tree = _build_directory_tree(path)
+                    console.print(tree)
         else:
             console.print(Panel.fit(
                 f"[bold red]✗ No datasets downloaded[/bold red]",
