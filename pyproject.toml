@@ -12,7 +12,7 @@ authors = [
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 keywords = ["neurolibre", "open-data", "reproducible", "osf", "zenodo","datalad","conp","gdown","aws"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -29,6 +29,7 @@ dependencies = [
     'zenodo-get',
     'pyyaml>=6.0',
     'jsonschema>=4.0',
+    'rich>=13.0.0',
 ]
 
 [project.scripts]

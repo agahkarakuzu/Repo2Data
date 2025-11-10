@@ -5,10 +5,15 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+
 from repo2data.config.loader import ConfigLoader
 from repo2data.config.validator import ConfigValidator
 from repo2data.downloader import DatasetDownloader
-from repo2data.utils.logger import get_logger
+from repo2data.utils.logger import get_logger, console
 
 logger = logging.getLogger(__name__)
 
@@ -64,17 +69,14 @@ class DatasetManager:
         ValueError
             If requirements are invalid
         """
-        self.logger.info("Loading requirements...")
-
         # Load configuration
         self.requirements = self.config_loader.load()
 
         # Validate configuration
         try:
             self.config_validator.validate(self.requirements)
-            self.logger.info("Requirements validated successfully")
         except ValueError as e:
-            self.logger.error(f"Invalid requirements: {e}")
+            self.logger.error(f"Invalid configuration: {e}")
             raise
 
         return self.requirements
@@ -95,11 +97,12 @@ class DatasetManager:
         >>> print(paths)
         ['./data/dataset1', './data/dataset2']
         """
-        self.logger.info("=" * 60)
-        self.logger.info("repo2data starting")
-        self.logger.info("=" * 60)
-        self.logger.info(f"Configuration: {self.config_loader.config_path}")
-        self.logger.info(f"Server mode: {self.server_mode}")
+        # Show header
+        console.print()
+        console.print(Panel.fit(
+            "[bold cyan]repo2data[/bold cyan]",
+            subtitle=f"config: {Path(self.config_loader.config_path).name}"
+        ))
 
         # Load requirements if not already loaded
         if self.requirements is None:
@@ -109,12 +112,15 @@ class DatasetManager:
         downloads = self._parse_requirements()
         results = []
 
-        self.logger.info(f"Found {len(downloads)} download(s) to process")
+        # Process downloads
+        for idx, (download_key, config) in enumerate(downloads.items(), 1):
+            project_name = config.get('projectName', 'unknown')
+            display_name = download_key or project_name
 
-        for download_key, config in downloads.items():
-            self.logger.info("-" * 60)
-            if download_key:
-                self.logger.info(f"Processing download: {download_key}")
+            console.print(
+                f"\n[cyan]({idx}/{len(downloads)})[/cyan] "
+                f"[bold]{display_name}[/bold]"
+            )
 
             try:
                 downloader = DatasetDownloader(
@@ -128,20 +134,28 @@ class DatasetManager:
                 result_path = downloader.download()
                 results.append(result_path)
 
-                self.logger.info(f"✓ Download complete: {result_path}")
+                console.print(
+                    f"  [green]✓[/green] Downloaded to [dim]{result_path}[/dim]"
+                )
 
             except Exception as e:
-                self.logger.error(
-                    f"✗ Download failed for {download_key or 'config'}: {e}"
-                )
+                self.logger.error(f"Failed: {e}")
                 # Continue with other downloads
                 continue
 
-        self.logger.info("=" * 60)
-        self.logger.info(
-            f"repo2data complete: {len(results)}/{len(downloads)} successful"
-        )
-        self.logger.info("=" * 60)
+        # Show summary
+        console.print()
+        if results:
+            console.print(Panel.fit(
+                f"[bold green]✓ {len(results)}/{len(downloads)} datasets downloaded[/bold green]",
+                border_style="green"
+            ))
+        else:
+            console.print(Panel.fit(
+                f"[bold red]✗ No datasets downloaded[/bold red]",
+                border_style="red"
+            ))
+        console.print()
 
         return results
 
@@ -173,7 +187,6 @@ class DatasetManager:
 
         if isinstance(first_value, dict):
             # Multi-download configuration
-            self.logger.debug("Detected multi-download configuration")
             downloads = {}
             for key, value in self.requirements.items():
                 if isinstance(value, dict):
@@ -181,7 +194,6 @@ class DatasetManager:
             return downloads
         else:
             # Single download configuration
-            self.logger.debug("Detected single download configuration")
             return {None: self.requirements}
 
     def get_download_info(self) -> Dict[str, Any]:
