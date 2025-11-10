@@ -7,7 +7,6 @@ import logging
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from repo2data.config.loader import ConfigLoader
@@ -97,19 +96,34 @@ class DatasetManager:
         >>> print(paths)
         ['./data/dataset1', './data/dataset2']
         """
-        # Show header
-        console.print()
-        console.print(Panel.fit(
-            "[bold cyan]repo2data[/bold cyan]",
-            subtitle=f"config: {Path(self.config_loader.config_path).name}"
-        ))
-
         # Load requirements if not already loaded
         if self.requirements is None:
             self.load_requirements()
 
         # Parse and execute downloads
         downloads = self._parse_requirements()
+
+        # Build header with source info
+        config_name = Path(self.config_loader.config_path).name
+        download_count = len(downloads)
+
+        # Get first source for display
+        first_config = next(iter(downloads.values()))
+        first_src = first_config.get('src', '')
+        if len(first_src) > 50:
+            first_src = first_src[:47] + "..."
+
+        # Create informative header
+        header_text = f"[bold cyan]repo2data[/bold cyan]\n"
+        header_text += f"[dim]config:[/dim] {config_name}\n"
+        header_text += f"[dim]downloads:[/dim] {download_count}"
+        if download_count == 1:
+            header_text += f"\n[dim]source:[/dim] {first_src}"
+
+        # Show header
+        console.print()
+        console.print(Panel.fit(header_text, border_style="cyan"))
+
         results = []
 
         # Process downloads
@@ -139,7 +153,7 @@ class DatasetManager:
                 )
 
             except Exception as e:
-                self.logger.error(f"Failed: {e}")
+                console.print(f"  [red]✗[/red] {str(e)}")
                 # Continue with other downloads
                 continue
 
@@ -147,7 +161,7 @@ class DatasetManager:
         console.print()
         if results:
             console.print(Panel.fit(
-                f"[bold green]✓ {len(results)}/{len(downloads)} datasets downloaded[/bold green]",
+                f"[bold green]✓ {len(results)}/{len(downloads)} dataset(s) downloaded[/bold green]",
                 border_style="green"
             ))
         else:

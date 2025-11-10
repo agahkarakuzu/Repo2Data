@@ -86,9 +86,9 @@ Documentation: https://github.com/SIMEXP/Repo2Data
         "-l", "--log-level",
         dest="log_level",
         required=False,
-        default="INFO",
+        default="WARNING",  # Changed from INFO to WARNING for cleaner output
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="Set logging level. Default: INFO"
+        help="Set logging level. Default: WARNING"
     )
 
     parser.add_argument(
@@ -122,7 +122,7 @@ def main() -> int:
     parser = get_parser()
     args = parser.parse_args()
 
-    # Setup logging
+    # Setup logging - only for ERROR/WARNING by default
     log_level = getattr(logging, args.log_level)
     setup_logger(
         name="repo2data",
@@ -143,19 +143,8 @@ def main() -> int:
         # Install datasets
         paths = manager.install()
 
-        # Report success
-        if paths:
-            logger.info("")
-            logger.info("=" * 60)
-            logger.info("SUCCESS: All datasets downloaded")
-            logger.info("=" * 60)
-            for path in paths:
-                logger.info(f"  → {path}")
-            logger.info("")
-            return 0
-        else:
-            logger.warning("No datasets were downloaded")
-            return 1
+        # Return exit code based on success
+        return 0 if paths else 1
 
     except FileNotFoundError as e:
         logger.error(f"File not found: {e}")

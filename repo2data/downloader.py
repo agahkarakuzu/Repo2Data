@@ -7,7 +7,7 @@ import logging
 
 from repo2data.cache.manager import CacheManager
 from repo2data.utils.decompressor import Decompressor
-from repo2data.utils.logger import get_logger
+from repo2data.utils.logger import get_logger, console
 
 # Import provider registry
 from repo2data.providers import registry
@@ -140,13 +140,11 @@ class DatasetDownloader:
         Exception
             If download fails
         """
-        self.logger.info(f"Destination: {self.destination}")
+        self.logger.debug(f"Destination: {self.destination}")
 
         # Check cache
         if self.cache_manager.is_cached(self.config):
-            self.logger.info(
-                f"Data already downloaded at {self.destination}"
-            )
+            console.print(f"  [green]✓[/green] Using cached data")
             return str(self.destination)
 
         # Ensure destination exists
@@ -168,10 +166,10 @@ class DatasetDownloader:
             raise
 
         # Download
-        self.logger.info(f"Using {provider.provider_name} provider")
+        self.logger.debug(f"Using {provider.provider_name} provider")
         try:
             downloaded_path = provider.download()
-            self.logger.info(f"Download completed: {downloaded_path}")
+            self.logger.debug(f"Download completed: {downloaded_path}")
         except Exception as e:
             self.logger.error(f"Download failed: {e}")
             raise
@@ -180,7 +178,7 @@ class DatasetDownloader:
         try:
             decompressed = self.decompressor.decompress_all()
             if decompressed:
-                self.logger.info(
+                self.logger.debug(
                     f"Decompressed {len(decompressed)} archive(s)"
                 )
         except Exception as e:
@@ -189,7 +187,8 @@ class DatasetDownloader:
 
         # Save cache
         try:
-            self.cache_manager.save_cache(self.config)
+            cache_path = self.cache_manager.save_cache(self.config)
+            console.print(f"  [green]✓[/green] Cache saved")
         except Exception as e:
             self.logger.warning(f"Failed to save cache: {e}")
             # Don't fail the download if cache save fails
