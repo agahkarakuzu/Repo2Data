@@ -228,9 +228,13 @@ def list_evidence_datasets(
 
 def _extract_project_name(config_path: Path) -> Optional[str]:
     """
-    Extract project name from config file.
+    Extract project name from config file with multiple fallback strategies.
 
-    Looks for 'projectName' field in the 'data' section of the config.
+    Tries in order:
+    1. data.projectName from config file (myst.yml or data_requirement.yaml)
+    2. projectName from top-level of data_requirement.json/yaml
+    3. binder/data_requirement.txt in same directory
+    4. Infer from project.github in myst.yml
 
     Parameters
     ----------
@@ -242,23 +246,68 @@ def _extract_project_name(config_path: Path) -> Optional[str]:
     str or None
         Project name if found, None otherwise
     """
+    import re
+    import json
+
+    repo_root = config_path.parent
+
     try:
+        # Load config file
         if config_path.suffix in ['.yml', '.yaml']:
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
         elif config_path.suffix == '.json':
-            import json
             with open(config_path, 'r') as f:
                 config = json.load(f)
         else:
-            return None
+            config = None
 
-        # Try to get projectName from data section
         if isinstance(config, dict):
+            # Strategy 1: Try data.projectName (myst.yml pattern)
             data_section = config.get('data', {})
             if isinstance(data_section, dict):
-                return data_section.get('projectName')
+                project_name = data_section.get('projectName')
+                if project_name:
+                    return project_name
 
+            # Strategy 2: Try top-level projectName (data_requirement.json/yaml pattern)
+            project_name = config.get('projectName')
+            if project_name:
+                return project_name
+
+            # Strategy 3: Infer from project.github in myst.yml
+            if config_path.name == 'myst.yml' or 'myst' in config_path.name.lower():
+                project_metadata = config.get('project', {})
+                if isinstance(project_metadata, dict):
+                    github_url = project_metadata.get('github', '')
+                    if github_url:
+                        # Extract from GitHub URL pattern
+                        match = re.search(r'github\.com/([^/]+)/([^/\s]+)', github_url)
+                        if match:
+                            username, repo = match.groups()
+                            repo = repo.rstrip('.git')
+                            return f"{username}_{repo}".lower()
+
+    except Exception:
+        pass
+
+    # Strategy 4: Check binder/data_requirement.txt
+    try:
+        binder_req = repo_root / 'binder' / 'data_requirement.txt'
+        if binder_req.exists():
+            with open(binder_req, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        # Try to parse as JSON
+                        try:
+                            req_data = json.loads(line)
+                            if isinstance(req_data, dict):
+                                project_name = req_data.get('projectName')
+                                if project_name:
+                                    return project_name
+                        except json.JSONDecodeError:
+                            pass
     except Exception:
         pass
 

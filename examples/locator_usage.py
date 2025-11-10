@@ -28,14 +28,24 @@ def example_basic_usage():
 def example_auto_detect():
     """Auto-detect project name from config file."""
     print("=" * 60)
-    print("Example 2: Auto-detect Project Name from myst.yml")
+    print("Example 2: Auto-detect Project Name")
     print("=" * 60)
 
-    # If project_name is not provided, it reads from the config file
+    # If project_name is not provided, it uses smart auto-detection
+    # Tries multiple strategies in order:
+    #   1. data.projectName from myst.yml or data_requirement.yaml
+    #   2. Top-level projectName from data_requirement.json
+    #   3. binder/data_requirement.txt
+    #   4. Infer from project.github in myst.yml
+
     data_path = locate_evidence_data(verify_exists=False)
 
     print(f"Auto-detected dataset path: {data_path}")
-    print("Project name read from data.projectName in myst.yml")
+    print("\nUses smart fallback strategies:")
+    print("  1. data.projectName in config")
+    print("  2. Top-level projectName")
+    print("  3. binder/data_requirement.txt")
+    print("  4. Inferred from project.github URL")
     print()
 
 
