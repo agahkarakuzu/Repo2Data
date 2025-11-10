@@ -2,6 +2,9 @@ tests/out/
 data/
 tests/in/neurolibre/data
 
+# Downloaded datasets (testing artifacts)
+repo2data_*/
+
 # Compiled python modules.
 *.pyc
 
