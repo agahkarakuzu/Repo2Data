@@ -12,6 +12,7 @@ Repo2Data is a **Python 3.7+** package that automatically fetches data from remo
 - 🔒 **Enhanced security** - Better validation and deprecated unsafe features
 - ⚡ **Sophisticated caching** - Content-based cache validation
 - 📊 **Better logging** - Proper logging framework with configurable levels
+- 📍 **Data locator** - Find datasets from notebooks without hardcoded paths
 - 🔄 **Backwards compatible** - Existing code continues to work
 
 ## Supported Data Sources
@@ -286,6 +287,49 @@ provider = registry.get_provider(
 )
 print(f"Selected: {provider.provider_name}")
 ```
+
+### Locating Data in Notebooks
+
+When working with notebooks in nested directories (e.g., `content/notebooks/analysis.ipynb`), you can use `locate_evidence_data()` to find your datasets without hardcoding paths:
+
+```python
+from repo2data import locate_evidence_data
+
+# Works from any nested directory in the repository
+# Automatically finds <repo_root>/data/<project_name>
+data_path = locate_evidence_data("my_dataset")
+
+# Use the path to load your data
+import pandas as pd
+df = pd.read_csv(data_path / "results.csv")
+```
+
+**Auto-detect project name from config:**
+```python
+# Reads projectName from myst.yml or data_requirement.yaml
+data_path = locate_evidence_data()
+```
+
+**List all available datasets:**
+```python
+from repo2data import list_evidence_datasets
+
+datasets = list_evidence_datasets()
+print(f"Available datasets: {datasets}")
+```
+
+**How it works:**
+- Traverses upward from current directory to find `myst.yml` (or other config files)
+- Constructs path following evidence/neurolibre convention: `<repo_root>/data/<project_name>`
+- Works reliably from notebooks at any depth in your repository
+
+**Benefits:**
+- ✓ No hardcoded paths in notebooks
+- ✓ Works from any nested directory
+- ✓ Follows evidence/neurolibre conventions
+- ✓ Simple one-line API
+
+See [`examples/locator_usage.py`](examples/locator_usage.py) for more examples.
 
 ## Architecture
 

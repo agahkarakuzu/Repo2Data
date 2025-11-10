@@ -30,6 +30,7 @@ from repo2data.config.loader import ConfigLoader
 from repo2data.config.validator import ConfigValidator
 from repo2data.cache.manager import CacheManager
 from repo2data.utils.logger import setup_logger, get_logger
+from repo2data.utils.locator import locate_evidence_data, list_evidence_datasets
 
 # Legacy API (deprecated, for backwards compatibility)
 from repo2data.repo2data import Repo2Data, Repo2DataChild
@@ -46,6 +47,8 @@ __all__ = [
     'CacheManager',
     'setup_logger',
     'get_logger',
+    'locate_evidence_data',
+    'list_evidence_datasets',
 
     # Legacy API (deprecated)
     'Repo2Data',
