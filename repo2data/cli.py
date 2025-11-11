@@ -55,8 +55,10 @@ Examples:
 
   # Cache management
   repo2data cache list               # List all cached datasets
-  repo2data cache clean              # Remove orphaned cache entries
+  repo2data cache info               # Show cache statistics
   repo2data cache verify             # Verify cache integrity
+  repo2data cache clean              # Remove orphaned cache entries
+  repo2data cache remove <project>   # Remove specific cache entry
   repo2data cache clear              # Clear all cache entries
   repo2data cache migrate /path      # Migrate old local caches to global cache
 
@@ -133,6 +135,21 @@ Documentation: https://github.com/SIMEXP/Repo2Data
         "--remove",
         action="store_true",
         help="Remove local cache files after successful migration"
+    )
+
+    # cache remove
+    remove_parser = cache_subparsers.add_parser(
+        "remove",
+        help="Remove cache entry by project name or path"
+    )
+    remove_parser.add_argument(
+        "identifier",
+        help="Project name or destination path to remove"
+    )
+    remove_parser.add_argument(
+        "--path",
+        action="store_true",
+        help="Treat identifier as a path instead of project name"
     )
 
     parser.add_argument(
@@ -515,6 +532,42 @@ def cache_migrate_command(args) -> int:
     return 0
 
 
+def cache_remove_command(args) -> int:
+    """Handle 'cache remove' command."""
+    cache = GlobalCacheManager()
+
+    console.print()
+
+    if args.path:
+        # Remove by destination path
+        console.print(f"[cyan]Removing cache entry for path: {args.identifier}[/cyan]")
+        removed = cache.remove_by_destination(args.identifier)
+    else:
+        # Remove by project name
+        console.print(f"[cyan]Removing cache entries for project: {args.identifier}[/cyan]")
+        removed = cache.remove_by_project(args.identifier)
+
+    console.print()
+
+    if removed > 0:
+        console.print(Panel(
+            f"[green]✓ Removed {removed} cache entr{'ies' if removed > 1 else 'y'}[/green]\n\n"
+            "[dim]Data files were NOT deleted[/dim]",
+            title="Cache Removed",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            f"[yellow]No cache entries found for: {args.identifier}[/yellow]\n\n"
+            "[dim]Use 'repo2data cache list' to see all cached datasets[/dim]",
+            title="Not Found",
+            border_style="yellow"
+        ))
+
+    console.print()
+    return 0
+
+
 def main() -> int:
     """
     Main entry point for repo2data CLI.
@@ -547,6 +600,8 @@ def main() -> int:
                 return cache_info_command(args)
             elif args.cache_command == "migrate":
                 return cache_migrate_command(args)
+            elif args.cache_command == "remove":
+                return cache_remove_command(args)
             else:
                 parser.print_help()
                 return 1

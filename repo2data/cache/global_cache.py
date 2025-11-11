@@ -502,6 +502,90 @@ class GlobalCacheManager:
             self.logger.error(f"Database error cleaning orphaned entries: {e}")
             return 0
 
+    def remove_by_project(self, project_name: str) -> int:
+        """
+        Remove cache entries by project name.
+
+        Parameters
+        ----------
+        project_name : str
+            Project name to remove
+
+        Returns
+        -------
+        int
+            Number of entries removed
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Find all entries with this project name
+            cursor.execute(
+                "SELECT cache_key, config FROM cache_entries"
+            )
+            entries = cursor.fetchall()
+
+            removed = 0
+            for entry in entries:
+                config = json.loads(entry['config'])
+                if config.get('projectName') == project_name:
+                    if self._remove_entry(entry['cache_key']):
+                        removed += 1
+
+            if removed > 0:
+                self.logger.info(
+                    f"Removed {removed} cache entr{'ies' if removed > 1 else 'y'} "
+                    f"for project: {project_name}"
+                )
+            else:
+                self.logger.warning(f"No cache entries found for project: {project_name}")
+
+            return removed
+
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error removing by project: {e}")
+            return 0
+
+    def remove_by_destination(self, destination_path: str) -> int:
+        """
+        Remove cache entry by destination path.
+
+        Parameters
+        ----------
+        destination_path : str
+            Destination path to remove
+
+        Returns
+        -------
+        int
+            Number of entries removed (0 or 1)
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Normalize path for comparison
+            dest = str(Path(destination_path).resolve())
+
+            cursor.execute(
+                "SELECT cache_key FROM cache_entries WHERE destination_path = ?",
+                (dest,)
+            )
+            entry = cursor.fetchone()
+
+            if entry:
+                if self._remove_entry(entry['cache_key']):
+                    self.logger.info(f"Removed cache entry for: {dest}")
+                    return 1
+
+            self.logger.warning(f"No cache entry found for: {dest}")
+            return 0
+
+        except sqlite3.Error as e:
+            self.logger.error(f"Database error removing by destination: {e}")
+            return 0
+
     def clear_all(self) -> int:
         """
         Clear all cache entries (does not delete data files).
