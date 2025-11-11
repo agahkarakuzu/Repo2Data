@@ -59,7 +59,7 @@ class CacheMigrator:
                         cache_files.append(cache_file)
 
                 # Also search for download_key prefixed caches
-                for cache_file in search_path.rglob("*_repo2data_cache.json"):
+                for cache_file in search_path.rglob("*_repo2data_cache_record.json"):
                     if cache_file.is_file():
                         cache_files.append(cache_file)
 
