@@ -1,6 +1,7 @@
 """Archive decompression utilities."""
 
 import os
+import shutil
 from pathlib import Path
 from typing import List
 import logging
@@ -119,6 +120,13 @@ class Decompressor:
             self.logger.info(
                 f"Successfully decompressed {len(decompressed)} archive(s)"
             )
+
+            # Clean up macOS junk files after extraction
+            removed = self.clean_macos_junk()
+            if removed > 0:
+                self.logger.debug(
+                    f"Removed {removed} macOS junk item(s) after extraction"
+                )
         else:
             self.logger.debug("No archives found to decompress")
 
@@ -186,6 +194,13 @@ class Decompressor:
             file_path.unlink()
             self.logger.info(f"Decompressed and deleted {file_path.name}")
 
+            # Clean up macOS junk files after extraction
+            removed = self.clean_macos_junk()
+            if removed > 0:
+                self.logger.debug(
+                    f"Removed {removed} macOS junk item(s) after extraction"
+                )
+
             return True
 
         except patoolib.util.PatoolError as e:
@@ -233,6 +248,68 @@ class Decompressor:
 
         formats = patoolib.list_formats()
         return sorted(formats)
+
+    def clean_macos_junk(self) -> int:
+        """
+        Remove macOS junk files and folders from the directory.
+
+        Removes:
+        - __MACOSX/ folders (resource forks created by macOS)
+        - .DS_Store files (Finder metadata)
+        - ._* files (AppleDouble format resource forks)
+
+        Returns
+        -------
+        int
+            Number of items removed
+
+        Examples
+        --------
+        >>> decompressor = Decompressor(Path("./data"))
+        >>> removed = decompressor.clean_macos_junk()
+        >>> print(f"Removed {removed} macOS junk items")
+        """
+        if not self.directory.exists():
+            return 0
+
+        removed_count = 0
+
+        # Remove __MACOSX folders (recursively search)
+        for macos_dir in self.directory.rglob("__MACOSX"):
+            if macos_dir.is_dir():
+                try:
+                    shutil.rmtree(macos_dir)
+                    self.logger.debug(f"Removed __MACOSX folder: {macos_dir}")
+                    removed_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Failed to remove {macos_dir}: {e}")
+
+        # Remove .DS_Store files
+        for ds_store in self.directory.rglob(".DS_Store"):
+            if ds_store.is_file():
+                try:
+                    ds_store.unlink()
+                    self.logger.debug(f"Removed .DS_Store: {ds_store}")
+                    removed_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Failed to remove {ds_store}: {e}")
+
+        # Remove AppleDouble format files (._*)
+        for apple_double in self.directory.rglob("._*"):
+            if apple_double.is_file():
+                try:
+                    apple_double.unlink()
+                    self.logger.debug(f"Removed AppleDouble file: {apple_double}")
+                    removed_count += 1
+                except Exception as e:
+                    self.logger.warning(f"Failed to remove {apple_double}: {e}")
+
+        if removed_count > 0:
+            self.logger.info(
+                f"Cleaned {removed_count} macOS junk item(s) from {self.directory}"
+            )
+
+        return removed_count
 
     def __repr__(self) -> str:
         """String representation of Decompressor."""

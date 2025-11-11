@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
 from rich.panel import Panel
 
 from repo2data.cache.manager import CacheManager
@@ -187,44 +186,16 @@ class DatasetDownloader:
             self.logger.error(f"No provider found: {e}")
             raise
 
-        # Download with progress indicator
+        # Download using provider
+        # Providers handle their own progress display
         self.logger.debug(f"Using {provider.provider_name} provider")
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=40),
-            DownloadColumn(),
-            TransferSpeedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-            transient=False
-        ) as progress:
-            # Create task with unknown total initially
-            task = progress.add_task(
-                f"[cyan]Downloading via {provider.provider_name}[/cyan]",
-                total=None
-            )
-
-            def update_progress(downloaded: int, total: int) -> None:
-                """Callback to update progress bar."""
-                if total > 0 and progress.tasks[task].total is None:
-                    # Set total on first callback
-                    progress.update(task, total=total)
-                progress.update(task, completed=downloaded)
-
-            # Set progress callback on provider
-            provider.set_progress_callback(update_progress)
-
-            try:
-                downloaded_path = provider.download()
-                # Ensure progress shows 100%
-                if progress.tasks[task].total:
-                    progress.update(task, completed=progress.tasks[task].total)
-                self.logger.debug(f"Download completed: {downloaded_path}")
-            except Exception as e:
-                self.logger.error(f"Download failed: {e}")
-                raise
+        try:
+            downloaded_path = provider.download()
+            self.logger.debug(f"Download completed: {downloaded_path}")
+        except Exception as e:
+            self.logger.error(f"Download failed: {e}")
+            raise
 
         # Decompress archives
         try:

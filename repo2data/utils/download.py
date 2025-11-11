@@ -197,7 +197,7 @@ def download_with_progress(
         "•",
         TimeRemainingColumn(),
         console=console,
-        transient=True  # Remove progress bar when done
+        transient=False  # Keep progress bar visible after completion
     ) as progress:
 
         task = progress.add_task(
