@@ -105,6 +105,10 @@ class HTTPProvider(BaseProvider):
                                 f.write(chunk)
                                 downloaded += len(chunk)
 
+                                # Report progress if callback is set
+                                if self.progress_callback:
+                                    self.progress_callback(downloaded, total_size)
+
                     if total_size > 0:
                         self.logger.info(
                             f"Downloaded {downloaded / (1024*1024):.2f} MB "

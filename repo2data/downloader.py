@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import logging
 
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
@@ -136,14 +136,14 @@ class DatasetDownloader:
         # Fallback: current directory
         return Path("./data") / project_name
 
-    def download(self) -> str:
+    def download(self) -> Tuple[str, bool]:
         """
         Execute the download with caching and decompression.
 
         Returns
         -------
-        str
-            Path to downloaded dataset
+        tuple of (str, bool)
+            Path to downloaded dataset and whether it was cached (True if cached)
 
         Raises
         ------
@@ -159,11 +159,11 @@ class DatasetDownloader:
             # console.print(f"  [green]✓[/green] Using cached data")
             console.print()
             console.print(Panel.fit(
-                f"[bold green]✅ Using cached data[/bold green]",
-                title="Cache Hit",
+                f"[chartreuse2]✅ Data has already been downloaded![/chartreuse2] \n\n[dim]{self.destination}[/dim]",
+                title="[bold]Cache Hit[/bold]",
                 border_style="green"
             ))
-            return str(self.destination)
+            return str(self.destination), True
 
         # Ensure destination exists
         self.destination.mkdir(parents=True, exist_ok=True)
@@ -189,19 +189,34 @@ class DatasetDownloader:
         with Progress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            BarColumn(bar_width=40),
+            DownloadColumn(),
+            TransferSpeedColumn(),
+            TimeRemainingColumn(),
             console=console,
-            transient=True
+            transient=False
         ) as progress:
+            # Create task with unknown total initially
             task = progress.add_task(
-                f"[cyan]Downloading via {provider.provider_name}...[/cyan]",
-                total=100
+                f"[cyan]Downloading via {provider.provider_name}[/cyan]",
+                total=None
             )
+
+            def update_progress(downloaded: int, total: int) -> None:
+                """Callback to update progress bar."""
+                if total > 0 and progress.tasks[task].total is None:
+                    # Set total on first callback
+                    progress.update(task, total=total)
+                progress.update(task, completed=downloaded)
+
+            # Set progress callback on provider
+            provider.set_progress_callback(update_progress)
 
             try:
                 downloaded_path = provider.download()
-                progress.update(task, completed=100)
+                # Ensure progress shows 100%
+                if progress.tasks[task].total:
+                    progress.update(task, completed=progress.tasks[task].total)
                 self.logger.debug(f"Download completed: {downloaded_path}")
             except Exception as e:
                 self.logger.error(f"Download failed: {e}")
@@ -226,7 +241,7 @@ class DatasetDownloader:
             self.logger.warning(f"Failed to save cache: {e}")
             # Don't fail the download if cache save fails
 
-        return str(self.destination)
+        return str(self.destination), False
 
     def get_provider_name(self) -> str:
         """

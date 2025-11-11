@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Callable
 import logging
 
 
@@ -29,6 +29,7 @@ class BaseProvider(ABC):
         self.destination = Path(destination)
         self.source = config.get("src", "")
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.progress_callback: Optional[Callable[[int, int], None]] = None
 
     @abstractmethod
     def can_handle(self, source: str) -> bool:
@@ -76,6 +77,20 @@ class BaseProvider(ABC):
             Provider name (e.g., "HTTP", "S3", "Google Drive")
         """
         pass
+
+    def set_progress_callback(
+        self,
+        callback: Optional[Callable[[int, int], None]]
+    ) -> None:
+        """
+        Set a progress callback function.
+
+        Parameters
+        ----------
+        callback : callable or None
+            Function that takes (downloaded_bytes, total_bytes) as arguments
+        """
+        self.progress_callback = callback
 
     def _ensure_destination_exists(self) -> None:
         """Create destination directory if it doesn't exist."""

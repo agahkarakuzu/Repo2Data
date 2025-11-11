@@ -177,6 +177,7 @@ class DatasetManager:
         console.print(Panel.fit(header_text, title="repo2data", border_style="cyan"))
 
         results = []
+        cached_results = []
 
         # Process downloads
         for idx, (download_key, config) in enumerate(downloads.items(), 1):
@@ -197,19 +198,22 @@ class DatasetManager:
                     download_key=download_key
                 )
 
-                result_path = downloader.download()
-                results.append(result_path)
+                result_path, was_cached = downloader.download()
 
-                console.print(
-                    f"  [green]✓[/green] Downloaded to [bright_yellow]{result_path}[/bright_yellow]"
-                )
+                if was_cached:
+                    cached_results.append(result_path)
+                else:
+                    results.append(result_path)
+                    console.print(
+                        f"  [green]✓[/green] Downloaded to [bright_yellow]{result_path}[/bright_yellow]"
+                    )
 
             except Exception as e:
                 console.print(f"  [red]✗[/red] {str(e)}")
                 # Continue with other downloads
                 continue
 
-        # Show summary with details
+        # Show summary with details only for fresh downloads
         console.print()
         if results:
             # Calculate total size
@@ -235,14 +239,16 @@ class DatasetManager:
                     console.print()
                     tree = _build_directory_tree(path)
                     console.print(Panel.fit(tree, border_style="plum1", title=f"Content tree"))
-        else:
+        elif not cached_results:
+            # Only show error if nothing was downloaded AND nothing was cached
             console.print(Panel.fit(
                 f"[bold red]✗ No datasets downloaded[/bold red]",
                 border_style="red"
             ))
         console.print()
 
-        return results
+        # Return all paths (both fresh downloads and cached)
+        return results + cached_results
 
     def _parse_requirements(self) -> Dict[Optional[str], Dict[str, Any]]:
         """
