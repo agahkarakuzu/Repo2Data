@@ -158,10 +158,11 @@ class DatasetDownloader:
         if self.cache_manager.is_cached(self.config):
             # console.print(f"  [green]✓[/green] Using cached data")
             console.print()
-            console.print(Panel.fit(
+            console.print(Panel(
                 f"[chartreuse2]✅ Data has already been downloaded![/chartreuse2] \n\n[dim]{self.destination}[/dim]",
                 title="[bold]Cache Hit[/bold]",
-                border_style="green"
+                border_style="green",
+                width=100
             ))
             return str(self.destination), True
 

@@ -10,15 +10,10 @@ Supports downloading from:
 - OSF (Open Science Framework)
 - Python library datasets
 
-New API (recommended):
+Usage:
     from repo2data import DatasetManager
     manager = DatasetManager("data_requirement.json")
     paths = manager.install()
-
-Legacy API (deprecated):
-    from repo2data import Repo2Data
-    repo2data = Repo2Data("data_requirement.json")
-    paths = repo2data.install()
 """
 
 __version__ = "2.9.1"
@@ -31,9 +26,6 @@ from repo2data.config.validator import ConfigValidator
 from repo2data.cache.manager import CacheManager
 from repo2data.utils.logger import setup_logger, get_logger
 from repo2data.utils.locator import locate_evidence_data, list_evidence_datasets
-
-# Legacy API (deprecated, for backwards compatibility)
-from repo2data.repo2data import Repo2Data, Repo2DataChild
 
 __all__ = [
     # Version
@@ -49,8 +41,4 @@ __all__ = [
     'get_logger',
     'locate_evidence_data',
     'list_evidence_datasets',
-
-    # Legacy API (deprecated)
-    'Repo2Data',
-    'Repo2DataChild',
 ]

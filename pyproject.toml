@@ -28,7 +28,7 @@ dependencies = [
     'gdown>=4.6.0',
     'zenodo-get',
     'pyyaml>=6.0',
-    'jsonschema>=4.0',
+    'pydantic>=2.0',
     'rich>=13.0.0',
 ]
 

@@ -125,11 +125,7 @@ class DatasetManager:
         self.requirements = self.config_loader.load()
 
         # Validate configuration
-        try:
-            self.config_validator.validate(self.requirements)
-        except ValueError as e:
-            self.logger.error(f"Invalid configuration: {e}")
-            raise
+        self.config_validator.validate(self.requirements)
 
         return self.requirements
 
@@ -238,7 +234,7 @@ class DatasetManager:
                 if path.exists():
                     console.print()
                     tree = _build_directory_tree(path)
-                    console.print(Panel.fit(tree, border_style="plum1", title=f"Content tree"))
+                    console.print(Panel(tree, border_style="plum1", width=80))
         elif not cached_results:
             # Only show error if nothing was downloaded AND nothing was cached
             console.print(Panel.fit(
