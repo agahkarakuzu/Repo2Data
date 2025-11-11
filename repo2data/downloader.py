@@ -23,6 +23,8 @@ from repo2data.providers.s3 import S3Provider
 from repo2data.providers.zenodo import ZenodoProvider
 from repo2data.providers.osf import OSFProvider
 from repo2data.providers.library import LibraryProvider
+from repo2data.providers.figshare import FigshareProvider
+from repo2data.providers.dataverse import DataverseProvider
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,8 @@ registry.register(GoogleDriveProvider)
 registry.register(S3Provider)
 registry.register(ZenodoProvider)
 registry.register(OSFProvider)
+registry.register(FigshareProvider)
+registry.register(DataverseProvider)
 registry.register(LibraryProvider)
 
 

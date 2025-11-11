@@ -1,0 +1,43 @@
+# Dataverse provider example
+#
+# Downloads datasets from Dataverse repositories using DOI or dataset URL
+#
+# Supported formats:
+# - Full URL: https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/XXXXXX
+# - DOI: doi:10.7910/DVN/XXXXXX
+# - dataverse:// protocol: dataverse://dataverse.harvard.edu/doi:10.7910/DVN/XXXXXX
+
+data:
+  # Example using Harvard Dataverse DOI
+  src: "doi:10.7910/DVN/TJCLKP"
+  projectName: "dataverse_dataset"
+  dst: "./data"
+
+# Alternative formats:
+#
+# Using full Dataverse URL:
+# data:
+#   src: "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/TJCLKP"
+#   projectName: "dataverse_dataset"
+#   dst: "./data"
+#
+# Using dataverse:// protocol (specify server and DOI):
+# data:
+#   src: "dataverse://dataverse.harvard.edu/doi:10.7910/DVN/TJCLKP"
+#   projectName: "dataverse_dataset"
+#   dst: "./data"
+#
+# Using different Dataverse installation (e.g., Dataverse NL):
+# data:
+#   src: "https://dataverse.nl/dataset.xhtml?persistentId=doi:10.34894/XXXXXX"
+#   projectName: "dataverse_nl_dataset"
+#   dst: "./data"
+#
+# Other supported Dataverse installations:
+# - https://dataverse.harvard.edu (Harvard Dataverse)
+# - https://dataverse.nl (DataverseNL)
+# - https://data.aussda.at (AUSSDA)
+# - https://dataverse.no (DataverseNO)
+# - https://dataverse.unc.edu (UNC Dataverse)
+# - https://archive.data.jhu.edu (JHU Data Archive)
+# - Many more Dataverse installations worldwide
