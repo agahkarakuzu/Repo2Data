@@ -278,7 +278,7 @@ class DatasetDownloader:
 
     def invalidate_cache(self) -> None:
         """Invalidate cache to force re-download."""
-        self.cache_manager.invalidate_cache()
+        self.cache_manager.invalidate_cache(self.config)
 
     def __repr__(self) -> str:
         """String representation."""

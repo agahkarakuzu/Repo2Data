@@ -12,6 +12,8 @@ from repo2data.config.loader import ConfigLoader
 from repo2data.config.validator import ConfigValidator
 from repo2data.downloader import DatasetDownloader
 from repo2data.utils.logger import get_logger, console
+from repo2data.cache.global_cache import GlobalCacheManager, get_cache_dir
+from repo2data.cache.migration import CacheMigrator
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,8 @@ class DatasetManager:
         self,
         requirement_path: Optional[str] = None,
         server_mode: bool = False,
-        server_destination: str = "./data"
+        server_destination: str = "./data",
+        auto_migrate_cache: bool = True
     ):
         """
         Initialize DatasetManager.
@@ -96,16 +99,20 @@ class DatasetManager:
             If True, force all downloads to server_destination
         server_destination : str
             Destination directory when in server mode
+        auto_migrate_cache : bool
+            If True, automatically migrate local cache files to global cache
         """
         self.requirement_path = requirement_path
         self.server_mode = server_mode
         self.server_destination = server_destination
+        self.auto_migrate_cache = auto_migrate_cache
         self.logger = get_logger(__name__)
 
         # Load and validate configuration
         self.config_loader = ConfigLoader(requirement_path)
         self.config_validator = ConfigValidator()
         self.requirements: Optional[Dict[str, Any]] = None
+        self._migration_done = False
 
     def load_requirements(self) -> Dict[str, Any]:
         """
@@ -129,6 +136,36 @@ class DatasetManager:
 
         return self.requirements
 
+    def _auto_migrate_caches(self) -> None:
+        """
+        Automatically migrate local cache files to global cache.
+
+        Runs once per DatasetManager instance. Silently migrates any
+        local cache files found near the config file or in common locations.
+        """
+        if self._migration_done or not self.auto_migrate_cache:
+            return
+
+        try:
+            # Create migrator
+            global_cache = GlobalCacheManager()
+            migrator = CacheMigrator(global_cache)
+
+            # Auto-migrate (without removing local files for backward compat)
+            migrated, failed = migrator.auto_migrate(
+                config_path=self.config_loader.config_path,
+                remove_after=False
+            )
+
+            if migrated > 0:
+                self.logger.debug(f"Auto-migrated {migrated} local cache entries to global cache")
+
+            self._migration_done = True
+
+        except Exception as e:
+            # Don't fail if migration fails - just log it
+            self.logger.debug(f"Cache auto-migration skipped: {e}")
+
     def install(self) -> List[str]:
         """
         Install all datasets defined in requirements.
@@ -148,6 +185,9 @@ class DatasetManager:
         # Load requirements if not already loaded
         if self.requirements is None:
             self.load_requirements()
+
+        # Auto-migrate local caches to global cache
+        self._auto_migrate_caches()
 
         # Parse and execute downloads
         downloads = self._parse_requirements()

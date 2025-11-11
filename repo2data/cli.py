@@ -11,9 +11,13 @@ import argparse
 import sys
 import logging
 from pathlib import Path
+from datetime import datetime
 
-from repo2data import DatasetManager, __version__
+from repo2data import DatasetManager, __version__, GlobalCacheManager, get_cache_dir
 from repo2data.utils.logger import setup_logger
+from rich.table import Table
+from rich.panel import Panel
+from repo2data.utils.logger import console
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -49,8 +53,69 @@ Examples:
   # Enable debug logging
   repo2data -r config.yaml --log-level DEBUG
 
+  # Cache management
+  repo2data cache list               # List all cached datasets
+  repo2data cache clean              # Remove orphaned cache entries
+  repo2data cache verify             # Verify cache integrity
+  repo2data cache clear              # Clear all cache entries
+
 Documentation: https://github.com/SIMEXP/Repo2Data
         """
+    )
+
+    # Add subparsers for cache commands
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+
+    # Cache command
+    cache_parser = subparsers.add_parser(
+        "cache",
+        help="Manage global cache",
+        description="Manage the global repo2data cache"
+    )
+    cache_subparsers = cache_parser.add_subparsers(
+        dest="cache_command",
+        help="Cache management command"
+    )
+
+    # cache list
+    list_parser = cache_subparsers.add_parser(
+        "list",
+        help="List all cached datasets"
+    )
+    list_parser.add_argument(
+        "--sort",
+        choices=["name", "size", "date"],
+        default="date",
+        help="Sort by name, size, or date. Default: date"
+    )
+
+    # cache clean
+    clean_parser = cache_subparsers.add_parser(
+        "clean",
+        help="Remove orphaned cache entries"
+    )
+
+    # cache verify
+    verify_parser = cache_subparsers.add_parser(
+        "verify",
+        help="Verify cache integrity"
+    )
+
+    # cache clear
+    clear_parser = cache_subparsers.add_parser(
+        "clear",
+        help="Clear all cache entries (does not delete data files)"
+    )
+    clear_parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Confirm cache clear without prompting"
+    )
+
+    # cache info
+    info_parser = cache_subparsers.add_parser(
+        "info",
+        help="Show cache statistics"
     )
 
     parser.add_argument(
@@ -109,6 +174,264 @@ Documentation: https://github.com/SIMEXP/Repo2Data
     return parser
 
 
+def _format_size(size_bytes: int) -> str:
+    """Format bytes to human-readable size."""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} PB"
+
+
+def _format_timestamp(timestamp_str: str) -> str:
+    """Format ISO timestamp to relative time."""
+    try:
+        dt = datetime.fromisoformat(timestamp_str)
+        now = datetime.now()
+        delta = now - dt
+
+        if delta.days > 365:
+            years = delta.days // 365
+            return f"{years} year{'s' if years > 1 else ''} ago"
+        elif delta.days > 30:
+            months = delta.days // 30
+            return f"{months} month{'s' if months > 1 else ''} ago"
+        elif delta.days > 0:
+            return f"{delta.days} day{'s' if delta.days > 1 else ''} ago"
+        elif delta.seconds > 3600:
+            hours = delta.seconds // 3600
+            return f"{hours} hour{'s' if hours > 1 else ''} ago"
+        elif delta.seconds > 60:
+            minutes = delta.seconds // 60
+            return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+        else:
+            return "just now"
+    except:
+        return timestamp_str
+
+
+def cache_list_command(args) -> int:
+    """Handle 'cache list' command."""
+    cache = GlobalCacheManager()
+    entries = cache.list_all_cached()
+
+    if not entries:
+        console.print(Panel(
+            "[yellow]No cached datasets found[/yellow]",
+            title="Cache",
+            border_style="yellow"
+        ))
+        return 0
+
+    # Sort entries
+    if args.sort == "name":
+        entries.sort(key=lambda x: x['config'].get('projectName', ''))
+    elif args.sort == "size":
+        entries.sort(key=lambda x: x['size_bytes'], reverse=True)
+    else:  # date
+        entries.sort(key=lambda x: x['last_accessed'], reverse=True)
+
+    # Create table
+    table = Table(title=f"Cached Datasets ({len(entries)} total)", show_header=True)
+    table.add_column("Project", style="cyan", no_wrap=True)
+    table.add_column("Size", style="yellow", justify="right")
+    table.add_column("Files", justify="right")
+    table.add_column("Last Accessed", style="dim")
+    table.add_column("Location", style="dim", overflow="fold")
+    table.add_column("Status", justify="center")
+
+    total_size = 0
+    for entry in entries:
+        project_name = entry['config'].get('projectName', 'unknown')
+        size = entry['size_bytes']
+        file_count = entry['file_count']
+        last_accessed = _format_timestamp(entry['last_accessed'])
+        location = entry['destination_path']
+        exists = entry['exists']
+        status = "[green]✓[/green]" if exists else "[red]✗[/red]"
+
+        table.add_row(
+            project_name,
+            _format_size(size),
+            str(file_count),
+            last_accessed,
+            location,
+            status
+        )
+        total_size += size
+
+    console.print()
+    console.print(table)
+    console.print()
+    console.print(f"[dim]Total cache size: {_format_size(total_size)}[/dim]")
+    console.print(f"[dim]Cache location: {get_cache_dir()}[/dim]")
+    console.print()
+
+    return 0
+
+
+def cache_clean_command(args) -> int:
+    """Handle 'cache clean' command."""
+    cache = GlobalCacheManager()
+
+    console.print()
+    console.print("[cyan]Cleaning orphaned cache entries...[/cyan]")
+
+    removed = cache.clean_orphaned_entries()
+
+    if removed > 0:
+        console.print(Panel(
+            f"[green]✓ Removed {removed} orphaned cache entr{'ies' if removed > 1 else 'y'}[/green]",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel(
+            "[green]✓ No orphaned cache entries found[/green]",
+            border_style="green"
+        ))
+
+    console.print()
+    return 0
+
+
+def cache_verify_command(args) -> int:
+    """Handle 'cache verify' command."""
+    cache = GlobalCacheManager()
+    entries = cache.list_all_cached()
+
+    if not entries:
+        console.print(Panel(
+            "[yellow]No cached datasets to verify[/yellow]",
+            title="Cache Verification",
+            border_style="yellow"
+        ))
+        return 0
+
+    console.print()
+    console.print(f"[cyan]Verifying {len(entries)} cached dataset(s)...[/cyan]")
+    console.print()
+
+    valid = 0
+    invalid = 0
+
+    for entry in entries:
+        project_name = entry['config'].get('projectName', 'unknown')
+        path = Path(entry['destination_path'])
+
+        if path.exists():
+            console.print(f"  [green]✓[/green] {project_name} - [dim]{path}[/dim]")
+            valid += 1
+        else:
+            console.print(f"  [red]✗[/red] {project_name} - [red]Missing:[/red] [dim]{path}[/dim]")
+            invalid += 1
+
+    console.print()
+
+    if invalid > 0:
+        console.print(Panel(
+            f"[yellow]⚠ {invalid} dataset(s) missing on disk[/yellow]\n\n"
+            f"Run [bold]repo2data cache clean[/bold] to remove orphaned entries",
+            title="Verification Results",
+            border_style="yellow"
+        ))
+    else:
+        console.print(Panel(
+            f"[green]✓ All {valid} cached dataset(s) verified[/green]",
+            title="Verification Results",
+            border_style="green"
+        ))
+
+    console.print()
+    return 0
+
+
+def cache_clear_command(args) -> int:
+    """Handle 'cache clear' command."""
+    cache = GlobalCacheManager()
+    entries = cache.list_all_cached()
+
+    if not entries:
+        console.print(Panel(
+            "[yellow]Cache is already empty[/yellow]",
+            title="Cache",
+            border_style="yellow"
+        ))
+        return 0
+
+    # Confirm if not already confirmed
+    if not args.confirm:
+        console.print()
+        console.print(f"[yellow]This will clear {len(entries)} cache entr{'ies' if len(entries) > 1 else 'y'}[/yellow]")
+        console.print("[dim](Data files will NOT be deleted)[/dim]")
+        console.print()
+        response = input("Continue? [y/N]: ")
+        if response.lower() not in ('y', 'yes'):
+            console.print("[yellow]Cancelled[/yellow]")
+            return 0
+
+    console.print()
+    console.print("[cyan]Clearing cache...[/cyan]")
+
+    cleared = cache.clear_all()
+
+    console.print(Panel(
+        f"[green]✓ Cleared {cleared} cache entr{'ies' if cleared > 1 else 'y'}[/green]",
+        border_style="green"
+    ))
+    console.print()
+
+    return 0
+
+
+def cache_info_command(args) -> int:
+    """Handle 'cache info' command."""
+    cache = GlobalCacheManager()
+    entries = cache.list_all_cached()
+
+    if not entries:
+        console.print(Panel(
+            "[yellow]Cache is empty[/yellow]",
+            title="Cache Statistics",
+            border_style="yellow"
+        ))
+        return 0
+
+    total_size = cache.get_total_cache_size()
+    total_files = sum(e['file_count'] for e in entries)
+    valid = sum(1 for e in entries if e['exists'])
+    invalid = len(entries) - valid
+
+    # Calculate age statistics
+    now = datetime.now()
+    ages = []
+    for e in entries:
+        try:
+            dt = datetime.fromisoformat(e['last_accessed'])
+            ages.append((now - dt).days)
+        except:
+            pass
+
+    avg_age = sum(ages) / len(ages) if ages else 0
+
+    info_text = f"""[bold cyan]Total Datasets:[/bold cyan] {len(entries)}
+[bold cyan]Total Size:[/bold cyan] {_format_size(total_size)}
+[bold cyan]Total Files:[/bold cyan] {total_files:,}
+[bold cyan]Valid Entries:[/bold cyan] {valid}
+[bold cyan]Orphaned Entries:[/bold cyan] {invalid}
+[bold cyan]Average Age:[/bold cyan] {int(avg_age)} days
+[bold cyan]Cache Location:[/bold cyan] {get_cache_dir()}"""
+
+    console.print()
+    console.print(Panel(
+        info_text,
+        title="Cache Statistics",
+        border_style="cyan"
+    ))
+    console.print()
+
+    return 0
+
+
 def main() -> int:
     """
     Main entry point for repo2data CLI.
@@ -122,12 +445,39 @@ def main() -> int:
     parser = get_parser()
     args = parser.parse_args()
 
-    # Setup logging - only for ERROR/WARNING by default
+    # Handle cache commands (no logging setup needed for these)
+    if args.command == "cache":
+        if not args.cache_command:
+            parser.print_help()
+            return 1
+
+        try:
+            if args.cache_command == "list":
+                return cache_list_command(args)
+            elif args.cache_command == "clean":
+                return cache_clean_command(args)
+            elif args.cache_command == "verify":
+                return cache_verify_command(args)
+            elif args.cache_command == "clear":
+                return cache_clear_command(args)
+            elif args.cache_command == "info":
+                return cache_info_command(args)
+            else:
+                parser.print_help()
+                return 1
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Interrupted by user[/yellow]")
+            return 130
+        except Exception as e:
+            console.print(f"\n[red]Error:[/red] {e}")
+            return 1
+
+    # Setup logging for download commands
     log_level = getattr(logging, args.log_level)
     setup_logger(
         name="repo2data",
         level=log_level,
-        log_file=args.log_file
+        log_file=args.log_file if hasattr(args, 'log_file') else None
     )
 
     logger = logging.getLogger("repo2data.cli")
@@ -159,7 +509,7 @@ def main() -> int:
         return 130
 
     except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=args.log_level == "DEBUG")
+        logger.error(f"Unexpected error: {e}", exc_info=args.log_level == "DEBUG" if hasattr(args, 'log_level') else False)
         return 1
 
 

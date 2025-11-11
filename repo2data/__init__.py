@@ -24,6 +24,8 @@ from repo2data.downloader import DatasetDownloader
 from repo2data.config.loader import ConfigLoader
 from repo2data.config.validator import ConfigValidator
 from repo2data.cache.manager import CacheManager
+from repo2data.cache.global_cache import GlobalCacheManager, get_cache_dir
+from repo2data.cache.migration import CacheMigrator
 from repo2data.utils.logger import setup_logger, get_logger
 from repo2data.utils.locator import locate_evidence_data, list_evidence_datasets
 
@@ -37,6 +39,9 @@ __all__ = [
     'ConfigLoader',
     'ConfigValidator',
     'CacheManager',
+    'GlobalCacheManager',
+    'CacheMigrator',
+    'get_cache_dir',
     'setup_logger',
     'get_logger',
     'locate_evidence_data',

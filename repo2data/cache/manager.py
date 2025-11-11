@@ -6,6 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
+import os
+
+from repo2data.cache.global_cache import GlobalCacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +16,9 @@ logger = logging.getLogger(__name__)
 class CacheManager:
     """
     Manages download caching with content-based validation.
+
+    Now uses the global cache system by default, with optional fallback
+    to local cache for backward compatibility.
 
     Uses hash-based caching to determine if data needs to be re-downloaded.
     Only critical fields (src, projectName, version) affect cache validation.
@@ -24,7 +30,8 @@ class CacheManager:
     def __init__(
         self,
         cache_dir: Path,
-        download_key: Optional[str] = None
+        download_key: Optional[str] = None,
+        use_global_cache: bool = True
     ):
         """
         Initialize CacheManager.
@@ -32,14 +39,27 @@ class CacheManager:
         Parameters
         ----------
         cache_dir : pathlib.Path
-            Directory where cache record is stored
+            Directory where data is stored (used as destination)
         download_key : str, optional
             Key for multi-download configurations
+        use_global_cache : bool
+            If True, use global cache system (default: True)
+            Can be disabled via REPO2DATA_USE_LOCAL_CACHE env var
         """
         self.cache_dir = Path(cache_dir)
         self.download_key = download_key
 
-        # Determine cache filename
+        # Check environment variable to override global cache
+        use_local = os.environ.get('REPO2DATA_USE_LOCAL_CACHE', '').lower() in ('1', 'true', 'yes')
+        self.use_global_cache = use_global_cache and not use_local
+
+        # Initialize global cache manager if enabled
+        if self.use_global_cache:
+            self.global_cache = GlobalCacheManager()
+        else:
+            self.global_cache = None
+
+        # Keep local cache file path for backward compatibility
         if download_key:
             self.cache_filename = f"{download_key}_{self.CACHE_FILENAME}"
         else:
@@ -96,6 +116,15 @@ class CacheManager:
         bool
             True if cached and valid
         """
+        # Use global cache if enabled
+        if self.use_global_cache and self.global_cache:
+            return self.global_cache.is_cached(
+                config,
+                self.cache_dir,
+                self.download_key
+            )
+
+        # Fall back to local cache
         if not self.cache_file.exists():
             self.logger.debug("No cache file found")
             return False
@@ -139,6 +168,17 @@ class CacheManager:
         metadata : dict, optional
             Additional metadata to store (e.g., file sizes, checksums)
         """
+        # Use global cache if enabled
+        if self.use_global_cache and self.global_cache:
+            self.global_cache.save_cache(
+                config,
+                self.cache_dir,
+                self.download_key,
+                metadata
+            )
+            return
+
+        # Fall back to local cache
         cache_key = self.compute_cache_key(config)
 
         cache_data = {
@@ -158,23 +198,46 @@ class CacheManager:
 
         self.logger.info(f"Cache saved to {self.cache_file}")
 
-    def invalidate_cache(self) -> None:
-        """Delete cache file to force re-download."""
+    def invalidate_cache(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Delete cache to force re-download.
+
+        Parameters
+        ----------
+        config : dict, optional
+            Configuration to invalidate (required for global cache)
+        """
+        # Use global cache if enabled
+        if self.use_global_cache and self.global_cache and config:
+            self.global_cache.invalidate_cache(config)
+            return
+
+        # Fall back to local cache
         if self.cache_file.exists():
             self.cache_file.unlink()
             self.logger.info(f"Cache invalidated: {self.cache_file}")
         else:
             self.logger.warning("No cache file to invalidate")
 
-    def get_cache_info(self) -> Optional[Dict[str, Any]]:
+    def get_cache_info(self, config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """
         Get cached information without validation.
+
+        Parameters
+        ----------
+        config : dict, optional
+            Configuration to look up (required for global cache)
 
         Returns
         -------
         dict or None
             Cached data if available, None otherwise
         """
+        # Use global cache if enabled
+        if self.use_global_cache and self.global_cache and config:
+            return self.global_cache.get_cache_info(config)
+
+        # Fall back to local cache
         if not self.cache_file.exists():
             return None
 
