@@ -1,0 +1,19 @@
+# Example: Download with checksum verification
+# This ensures data integrity by verifying the downloaded file
+
+data:
+  src: "https://raw.githubusercontent.com/SIMEXP/Repo2Data/master/README.md"
+  dst: "./data"
+  projectName: "repo2data_checksum_example"
+
+  # Optional: Verify data integrity with checksum
+  # You can use sha256 (recommended), md5, or sha1
+  checksum: "REPLACE_WITH_ACTUAL_CHECKSUM"  # Replace with actual SHA256 hash
+  checksum_algorithm: "sha256"  # Default is sha256
+
+# To generate checksum for a file:
+# On Linux/Mac: sha256sum filename
+# On Windows: certutil -hashfile filename SHA256
+# Or use Python:
+#   from repo2data.utils import compute_checksum
+#   compute_checksum("path/to/file", "sha256")

@@ -13,6 +13,9 @@ Repo2Data is a **Python 3.7+** package that automatically fetches data from remo
 - ⚡ **Sophisticated caching** - Content-based cache validation
 - 📊 **Better logging** - Proper logging framework with configurable levels
 - 📍 **Data locator** - Find datasets from notebooks without hardcoded paths
+- 📈 **Progress bars** - Visual feedback for downloads with rich UI
+- ✅ **Checksum verification** - SHA256/MD5 integrity checking
+- 💾 **Disk space checking** - Validates space before downloading
 - 🔄 **Backwards compatible** - Existing code continues to work
 
 ## Supported Data Sources
@@ -133,6 +136,36 @@ paths = repo2data.install()
 ```
 
 The archive will be automatically extracted and the `.tar.gz` file removed.
+
+### Data Integrity with Checksums
+
+Verify downloaded data integrity using checksums (recommended for research data):
+
+```yaml
+data:
+  src: "https://example.com/dataset.tar.gz"
+  dst: "./data"
+  projectName: "verified_data"
+
+  # Optional: Verify integrity with checksum
+  checksum: "abc123def456..."  # SHA256 hash
+  checksum_algorithm: "sha256"  # Options: sha256, md5, sha1
+```
+
+**Generate checksums:**
+```bash
+# Linux/Mac
+sha256sum filename
+
+# Windows
+certutil -hashfile filename SHA256
+
+# Python
+from repo2data.utils import compute_checksum
+checksum = compute_checksum("path/to/file", "sha256")
+```
+
+If verification fails, the download is rejected and an error is raised, ensuring you never work with corrupted data.
 
 ### Google Drive
 

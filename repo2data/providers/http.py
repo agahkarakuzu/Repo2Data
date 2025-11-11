@@ -3,10 +3,17 @@
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import requests
 
 from repo2data.providers.base import BaseProvider
+from repo2data.utils.download import (
+    download_with_progress,
+    check_disk_space,
+    verify_checksum,
+    compute_checksum
+)
+from repo2data.utils.logger import console
 
 
 class HTTPProvider(BaseProvider):
@@ -69,7 +76,7 @@ class HTTPProvider(BaseProvider):
 
     def download(self) -> Path:
         """
-        Download file from HTTP/HTTPS URL.
+        Download file from HTTP/HTTPS URL with progress tracking and verification.
 
         Returns
         -------
@@ -80,64 +87,113 @@ class HTTPProvider(BaseProvider):
         ------
         Exception
             If download fails after all retries
+        OSError
+            If insufficient disk space
+        ValueError
+            If checksum verification fails
         """
         self._ensure_destination_exists()
 
         url = self.source
-        self.logger.info(f"Downloading from {url}")
+        self.logger.debug(f"Downloading from {url}")
+
+        # Get checksum from config if provided
+        expected_checksum = self.config.get("checksum")
+        checksum_algorithm = self.config.get("checksum_algorithm", "sha256")
 
         for retry in range(self.max_retries):
             try:
                 response = requests.get(url, stream=True, timeout=30)
 
                 if response.status_code == 200:
-                    # Get filename from URL
+                    # Get filename and file size
                     filename = self._extract_filename(url, response)
                     filepath = self.destination / filename
+                    tmp_filepath = filepath.with_suffix(filepath.suffix + '.tmp')
 
-                    # Download the file
                     total_size = int(response.headers.get('content-length', 0))
-                    downloaded = 0
 
-                    with open(filepath, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            if chunk:
-                                f.write(chunk)
-                                downloaded += len(chunk)
-
-                                # Report progress if callback is set
-                                if self.progress_callback:
-                                    self.progress_callback(downloaded, total_size)
-
+                    # Check disk space before downloading
                     if total_size > 0:
-                        self.logger.info(
-                            f"Downloaded {downloaded / (1024*1024):.2f} MB "
-                            f"to {filepath}"
-                        )
-                    else:
-                        self.logger.info(f"Downloaded to {filepath}")
+                        try:
+                            check_disk_space(self.destination, total_size)
+                        except OSError as e:
+                            console.print(f"  [red]✗[/red] {str(e)}")
+                            raise
 
-                    return filepath
+                    # Download with progress bar
+                    try:
+                        with open(tmp_filepath, 'wb') as f:
+                            downloaded = download_with_progress(
+                                response.iter_content,
+                                f,
+                                total_size=total_size if total_size > 0 else None,
+                                description=f"  Downloading {filename}"
+                            )
 
+                        # Verify checksum if provided
+                        if expected_checksum:
+                            console.print(f"  [cyan]Verifying checksum ({checksum_algorithm})...[/cyan]")
+                            try:
+                                verify_checksum(tmp_filepath, expected_checksum, checksum_algorithm)
+                                console.print(f"  [green]✓[/green] Checksum verified")
+                            except ValueError as e:
+                                # Clean up failed download
+                                tmp_filepath.unlink(missing_ok=True)
+                                raise
+
+                        # Atomic move: tmp -> final
+                        tmp_filepath.rename(filepath)
+
+                        self.logger.debug(f"Downloaded to {filepath}")
+                        return filepath
+
+                    except Exception as e:
+                        # Clean up temp file on any error
+                        tmp_filepath.unlink(missing_ok=True)
+                        raise
+
+                elif response.status_code == 404:
+                    raise Exception(
+                        f"File not found (404): {url}\n"
+                        f"Please check the URL is correct."
+                    )
+                elif response.status_code == 403:
+                    raise Exception(
+                        f"Access forbidden (403): {url}\n"
+                        f"You may not have permission to access this resource."
+                    )
                 else:
                     self.logger.warning(
                         f"Attempt {retry + 1}/{self.max_retries} - "
-                        f"Status code: {response.status_code}"
+                        f"HTTP {response.status_code}: {response.reason}"
                     )
 
+            except requests.Timeout:
+                self.logger.warning(
+                    f"Attempt {retry + 1}/{self.max_retries} - "
+                    f"Timeout after 30 seconds"
+                )
+            except requests.ConnectionError as e:
+                self.logger.warning(
+                    f"Attempt {retry + 1}/{self.max_retries} - "
+                    f"Connection error: {e}"
+                )
             except requests.RequestException as e:
                 self.logger.warning(
                     f"Attempt {retry + 1}/{self.max_retries} - "
-                    f"Error: {e}"
+                    f"Request error: {e}"
                 )
 
-            # Retry with delay
+            # Retry with exponential backoff
             if retry < self.max_retries - 1:
-                self.logger.info(f"Retrying in {self.retry_delay} seconds...")
-                time.sleep(self.retry_delay)
+                delay = self.retry_delay * (2 ** retry)  # Exponential backoff
+                self.logger.info(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
 
         raise Exception(
-            f"Failed to download {url} after {self.max_retries} attempts"
+            f"Failed to download from {url} after {self.max_retries} attempts.\n"
+            f"Please check your internet connection and try again."
         )
 
     def _extract_filename(
