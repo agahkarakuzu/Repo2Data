@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 import logging
 
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
@@ -136,14 +136,14 @@ class DatasetDownloader:
         # Fallback: current directory
         return Path("./data") / project_name
 
-    def download(self) -> Tuple[str, bool]:
+    def download(self) -> str:
         """
         Execute the download with caching and decompression.
 
         Returns
         -------
-        tuple of (str, bool)
-            Path to downloaded dataset and whether it was cached (True if cached)
+        str
+            Path to downloaded dataset
 
         Raises
         ------
@@ -156,7 +156,6 @@ class DatasetDownloader:
 
         # Check cache
         if self.cache_manager.is_cached(self.config):
-            # console.print(f"  [green]✓[/green] Using cached data")
             console.print()
             console.print(Panel(
                 f"[chartreuse2]✅ Data has already been downloaded![/chartreuse2] \n\n[dim]{self.destination}[/dim]",
@@ -164,7 +163,7 @@ class DatasetDownloader:
                 border_style="green",
                 width=100
             ))
-            return str(self.destination), True
+            return str(self.destination)
 
         # Ensure destination exists
         self.destination.mkdir(parents=True, exist_ok=True)
@@ -242,7 +241,7 @@ class DatasetDownloader:
             self.logger.warning(f"Failed to save cache: {e}")
             # Don't fail the download if cache save fails
 
-        return str(self.destination), False
+        return str(self.destination)
 
     def get_provider_name(self) -> str:
         """

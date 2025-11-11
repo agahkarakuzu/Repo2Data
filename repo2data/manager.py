@@ -194,7 +194,9 @@ class DatasetManager:
                     download_key=download_key
                 )
 
-                result_path, was_cached = downloader.download()
+                # Check if cached before downloading
+                was_cached = downloader.is_cached()
+                result_path = downloader.download()
 
                 if was_cached:
                     cached_results.append(result_path)
