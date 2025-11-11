@@ -106,6 +106,10 @@ class CacheManager:
         """
         Check if data is already cached.
 
+        Checks global cache first, then falls back to local cache for
+        backward compatibility. If a valid local cache is found, it's
+        automatically migrated to the global cache.
+
         Parameters
         ----------
         config : dict
@@ -116,15 +120,57 @@ class CacheManager:
         bool
             True if cached and valid
         """
-        # Use global cache if enabled
+        # Check global cache if enabled
         if self.use_global_cache and self.global_cache:
-            return self.global_cache.is_cached(
+            is_in_global = self.global_cache.is_cached(
                 config,
                 self.cache_dir,
                 self.download_key
             )
 
-        # Fall back to local cache
+            if is_in_global:
+                return True
+
+            # Not in global cache - check for local cache file
+            # and migrate it if found
+            if self.cache_file.exists():
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        cached_data = json.load(f)
+
+                    # Compare cache keys
+                    current_key = self.compute_cache_key(config)
+                    cached_key = cached_data.get("cache_key")
+
+                    if current_key == cached_key:
+                        # Valid local cache found - migrate it to global cache
+                        self.logger.info(
+                            f"Found local cache, migrating to global cache"
+                        )
+
+                        metadata = cached_data.get("metadata", {})
+                        self.global_cache.save_cache(
+                            config,
+                            self.cache_dir,
+                            self.download_key,
+                            metadata
+                        )
+
+                        # Keep the local cache file for now (don't break old tools)
+                        # It will be naturally superseded by global cache
+
+                        cached_time = cached_data.get("timestamp", "unknown")
+                        self.logger.info(
+                            f"Cache hit! Data cached at {cached_time} (migrated from local)"
+                        )
+                        return True
+
+                except (json.JSONDecodeError, KeyError) as e:
+                    self.logger.warning(f"Invalid local cache file: {e}")
+
+            return False
+
+        # Fall back to local cache only (when global cache disabled)
         if not self.cache_file.exists():
             self.logger.debug("No cache file found")
             return False

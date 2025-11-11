@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-from repo2data import DatasetManager, __version__, GlobalCacheManager, get_cache_dir
+from repo2data import DatasetManager, __version__, GlobalCacheManager, get_cache_dir, CacheMigrator
 from repo2data.utils.logger import setup_logger
 from rich.table import Table
 from rich.panel import Panel
@@ -58,6 +58,7 @@ Examples:
   repo2data cache clean              # Remove orphaned cache entries
   repo2data cache verify             # Verify cache integrity
   repo2data cache clear              # Clear all cache entries
+  repo2data cache migrate /path      # Migrate old local caches to global cache
 
 Documentation: https://github.com/SIMEXP/Repo2Data
         """
@@ -116,6 +117,22 @@ Documentation: https://github.com/SIMEXP/Repo2Data
     info_parser = cache_subparsers.add_parser(
         "info",
         help="Show cache statistics"
+    )
+
+    # cache migrate
+    migrate_parser = cache_subparsers.add_parser(
+        "migrate",
+        help="Migrate local cache files to global cache"
+    )
+    migrate_parser.add_argument(
+        "paths",
+        nargs="*",
+        help="Directories to search for local cache files (default: current directory)"
+    )
+    migrate_parser.add_argument(
+        "--remove",
+        action="store_true",
+        help="Remove local cache files after successful migration"
     )
 
     parser.add_argument(
@@ -432,6 +449,72 @@ def cache_info_command(args) -> int:
     return 0
 
 
+def cache_migrate_command(args) -> int:
+    """Handle 'cache migrate' command."""
+    cache = GlobalCacheManager()
+    migrator = CacheMigrator(cache)
+
+    # Determine search paths
+    if args.paths:
+        search_paths = [Path(p).resolve() for p in args.paths]
+    else:
+        search_paths = [Path.cwd()]
+
+    console.print()
+    console.print(f"[cyan]Searching for local cache files in {len(search_paths)} location(s)...[/cyan]")
+    console.print()
+
+    # Find all local cache files
+    cache_files = migrator.find_local_caches(search_paths)
+
+    if not cache_files:
+        console.print(Panel(
+            "[yellow]No local cache files found[/yellow]\n\n"
+            "[dim]Local cache files are named 'repo2data_cache.json' or '*_repo2data_cache.json'[/dim]",
+            title="Migration",
+            border_style="yellow"
+        ))
+        return 0
+
+    console.print(f"[cyan]Found {len(cache_files)} local cache file(s)[/cyan]")
+    console.print()
+
+    # Show files to be migrated
+    for cache_file in cache_files[:10]:  # Show first 10
+        console.print(f"  [dim]• {cache_file}[/dim]")
+    if len(cache_files) > 10:
+        console.print(f"  [dim]... and {len(cache_files) - 10} more[/dim]")
+
+    console.print()
+
+    # Migrate
+    console.print("[cyan]Migrating to global cache...[/cyan]")
+    migrated, failed = migrator.migrate_all(search_paths, remove_after=args.remove)
+
+    console.print()
+
+    if migrated > 0:
+        action = "migrated and removed" if args.remove else "migrated"
+        console.print(Panel(
+            f"[green]✓ Successfully {action} {migrated} local cache file(s)[/green]" +
+            (f"\n[red]✗ Failed to migrate {failed} file(s)[/red]" if failed > 0 else ""),
+            title="Migration Complete",
+            border_style="green"
+        ))
+        console.print()
+        console.print(f"[dim]Global cache location: {get_cache_dir()}[/dim]")
+    else:
+        console.print(Panel(
+            "[yellow]No cache files were migrated[/yellow]\n\n"
+            "[dim]Cache files may already be migrated or contain invalid data[/dim]",
+            title="Migration",
+            border_style="yellow"
+        ))
+
+    console.print()
+    return 0
+
+
 def main() -> int:
     """
     Main entry point for repo2data CLI.
@@ -462,6 +545,8 @@ def main() -> int:
                 return cache_clear_command(args)
             elif args.cache_command == "info":
                 return cache_info_command(args)
+            elif args.cache_command == "migrate":
+                return cache_migrate_command(args)
             else:
                 parser.print_help()
                 return 1
