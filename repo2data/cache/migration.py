@@ -95,11 +95,26 @@ class CacheMigrator:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
 
-            # Extract information
-            config = cache_data.get('config', {})
-            timestamp = cache_data.get('timestamp')
-            metadata = cache_data.get('metadata', {})
-            cache_version = cache_data.get('cache_version', '2.0')
+            # Handle both old and new cache formats
+            # Old format (v1.0): {"src": "...", "dst": "...", "projectName": "..."}
+            # New format (v2.0): {"config": {...}, "timestamp": "...", "cache_version": "2.0"}
+            if 'config' in cache_data:
+                # New format (v2.0+)
+                config = cache_data.get('config', {})
+                timestamp = cache_data.get('timestamp')
+                metadata = cache_data.get('metadata', {})
+                cache_version = cache_data.get('cache_version', '2.0')
+            elif 'src' in cache_data:
+                # Old format (v1.0) - treat entire cache_data as config
+                config = cache_data
+                timestamp = None
+                metadata = {}
+                cache_version = '1.0'
+            else:
+                self.logger.warning(
+                    f"Invalid cache file {cache_file}: unrecognized format"
+                )
+                return False
 
             # Determine destination path (parent directory of cache file)
             destination = cache_file.parent
@@ -108,13 +123,17 @@ class CacheMigrator:
             download_key = None
             filename = cache_file.name
             if filename != self.LOCAL_CACHE_FILENAME:
-                # Extract from filename like "dataset1_repo2data_cache.json"
-                download_key = filename.replace(f"_{self.LOCAL_CACHE_FILENAME}", "")
+                # Extract from filename like "dataset1_repo2data_cache_record.json"
+                # Remove the suffix to get the download_key
+                if filename.endswith("_repo2data_cache_record.json"):
+                    download_key = filename.replace("_repo2data_cache_record.json", "")
+                else:
+                    download_key = filename.replace(f"_{self.LOCAL_CACHE_FILENAME}", "")
 
             # Validate we have required fields
             if not config or 'src' not in config:
                 self.logger.warning(
-                    f"Invalid cache file {cache_file}: missing config or src"
+                    f"Invalid cache file {cache_file}: missing src field"
                 )
                 return False
 
