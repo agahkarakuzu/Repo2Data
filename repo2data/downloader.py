@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, DownloadColumn, TransferSpeedColumn, TimeRemainingColumn
+from rich.panel import Panel
+
 from repo2data.cache.manager import CacheManager
 from repo2data.utils.decompressor import Decompressor
 from repo2data.utils.logger import get_logger, console
@@ -153,7 +156,13 @@ class DatasetDownloader:
 
         # Check cache
         if self.cache_manager.is_cached(self.config):
-            console.print(f"  [green]✓[/green] Using cached data")
+            # console.print(f"  [green]✓[/green] Using cached data")
+            console.print()
+            console.print(Panel.fit(
+                f"[bold green]✅ Using cached data[/bold green]",
+                title="Cache Hit",
+                border_style="green"
+            ))
             return str(self.destination)
 
         # Ensure destination exists
@@ -174,14 +183,29 @@ class DatasetDownloader:
             self.logger.error(f"No provider found: {e}")
             raise
 
-        # Download
+        # Download with progress indicator
         self.logger.debug(f"Using {provider.provider_name} provider")
-        try:
-            downloaded_path = provider.download()
-            self.logger.debug(f"Download completed: {downloaded_path}")
-        except Exception as e:
-            self.logger.error(f"Download failed: {e}")
-            raise
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=console,
+            transient=True
+        ) as progress:
+            task = progress.add_task(
+                f"[cyan]Downloading via {provider.provider_name}...[/cyan]",
+                total=100
+            )
+
+            try:
+                downloaded_path = provider.download()
+                progress.update(task, completed=100)
+                self.logger.debug(f"Download completed: {downloaded_path}")
+            except Exception as e:
+                self.logger.error(f"Download failed: {e}")
+                raise
 
         # Decompress archives
         try:

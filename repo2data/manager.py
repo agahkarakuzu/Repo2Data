@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 
-from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 from rich.tree import Tree
 
 from repo2data.config.loader import ConfigLoader
@@ -169,15 +167,14 @@ class DatasetManager:
             first_src = first_src[:47] + "..."
 
         # Create informative header
-        header_text = f"[bold cyan]repo2data[/bold cyan]\n"
-        header_text += f"[dim]config:[/dim] {config_name}\n"
+        header_text = f"[dim]config:[/dim] {config_name}\n"
         header_text += f"[dim]downloads:[/dim] {download_count}"
         if download_count == 1:
             header_text += f"\n[dim]source:[/dim] {first_src}"
 
         # Show header
         console.print()
-        console.print(Panel.fit(header_text, border_style="cyan"))
+        console.print(Panel.fit(header_text, title="repo2data", border_style="cyan"))
 
         results = []
 
@@ -204,7 +201,7 @@ class DatasetManager:
                 results.append(result_path)
 
                 console.print(
-                    f"  [green]✓[/green] Downloaded to [dim]{result_path}[/dim]"
+                    f"  [green]✓[/green] Downloaded to [bright_yellow]{result_path}[/bright_yellow]"
                 )
 
             except Exception as e:
@@ -229,7 +226,7 @@ class DatasetManager:
                 for result_path in results:
                     summary += f"  • {result_path}\n"
 
-            console.print(Panel(summary.rstrip(), border_style="green", title="Summary"))
+            console.print(Panel.fit(summary.rstrip(), border_style="green", title="Summary"))
 
             # Show directory tree for each download
             for result_path in results:
@@ -237,7 +234,7 @@ class DatasetManager:
                 if path.exists():
                     console.print()
                     tree = _build_directory_tree(path)
-                    console.print(tree)
+                    console.print(Panel.fit(tree, border_style="plum1", title=f"Content tree"))
         else:
             console.print(Panel.fit(
                 f"[bold red]✗ No datasets downloaded[/bold red]",
