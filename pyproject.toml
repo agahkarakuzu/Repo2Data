@@ -12,7 +12,7 @@ authors = [
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 keywords = ["neurolibre", "open-data", "reproducible", "osf", "zenodo","datalad","conp","gdown","aws"]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -25,16 +25,21 @@ dependencies = [
     'datalad',
     'requests',
     'osfclient',
-    'gdown',
+    'gdown>=4.6.0',
     'zenodo-get',
-    'requests'
+    'pyyaml>=6.0',
+    'pydantic>=2.0',
+    'rich>=13.0.0',
 ]
 
 [project.scripts]
-repo2data =  "repo2data.bin.repo2data:main"
+repo2data = "repo2data.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/SIMEXP/Repo2Data"
+
+[tool.setuptools]
+packages = { find = { where = ["."], include = ["repo2data*"], exclude = ["data*", "tests*"] } }
 
 [tool.setuptools_scm]
 version_scheme = "post-release"

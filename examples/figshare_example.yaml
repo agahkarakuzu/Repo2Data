@@ -1,0 +1,28 @@
+# Figshare provider example
+#
+# Downloads datasets from Figshare repository using DOI, URL, or figshare:// protocol
+#
+# Supported formats:
+# - DOI: doi:10.6084/m9.figshare.XXXXXX
+# - URL: https://figshare.com/articles/dataset/Title/XXXXXX
+# - Protocol: figshare://XXXXXX
+
+data:
+  # Example using Figshare DOI
+  src: "doi:10.6084/m9.figshare.7778845"
+  projectName: "figshare_dataset"
+  dst: "./data"
+
+# Alternative formats:
+#
+# Using direct Figshare URL:
+# data:
+#   src: "https://figshare.com/articles/dataset/Example_Dataset/7778845"
+#   projectName: "figshare_dataset"
+#   dst: "./data"
+#
+# Using figshare:// protocol with article ID:
+# data:
+#   src: "figshare://7778845"
+#   projectName: "figshare_dataset"
+#   dst: "./data"

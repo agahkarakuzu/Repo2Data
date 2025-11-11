@@ -1,0 +1,7 @@
+# Example: Download from Zenodo using DOI
+# YAML format
+
+data:
+  src: "10.5281/zenodo.6482995"
+  dst: "./"
+  projectName: "zenodo_dataset"

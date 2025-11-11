@@ -1,0 +1,119 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  title: 'A living bibliometric dashboard: Tracking Top 2% Researchers with ElasticSearch and Dash'
+  subtitle: Based on standardized citation indicators across science-wide author databases
+  authors:
+    - name: Nadia Blostein
+      orcid: 0000-0002-1864-1899
+      affiliations: ucc
+      roles:
+        - Software
+        - Writing – original draft
+    - name: Agah Karakuzu
+      orcid: 0000-0001-7283-271X
+      affiliations: polymtl; mhi
+      corresponding: true
+      email: agah.karakuzu@polymtl.ca
+      twitter: agahkarakuzu
+      url: https://agah.dev
+      github: agahkarakuzu
+      roles:
+        - Software
+        - Writing – review & editing
+    - name: Nikola Stikov
+      orcid: 0000-0002-8480-5230
+      affiliations: polymtl; mhi; macedonia
+      roles:
+        - Writing – review & editing
+    - name: John P.A. Ioannidis
+      orcid: 0000-0003-3118-6859
+      affiliations: stanfordmed
+      roles:
+        - Writing – review & editing
+  affiliations:
+    - id: polymtl
+      institution: NeuroPoly Lab, Polytechnique Montreal
+      ror: https://ror.org/05f8d4e86
+      isni: 0000 0004 0435 3292
+      department: Electrical Engineering
+      address: 2500 Chem. de Polytechnique
+      city: Montreal
+      region: Quebec
+      country: Canada
+      postal_code: H3T 1J4
+      phone: 1 (514) 340-4711
+    - id: mhi
+      institution: Montreal Heart Institute
+      ror: https://ror.org/03vs03g62
+      isni: 0000 0000 8995 9090
+      address: 5000 Rue Belanger
+      city: Montreal
+      region: Quebec
+      country: Canada
+      postal_code: H1T 1C8
+    - id: ucc
+      institution: University Collage Cork
+      ror: https://ror.org/03265fv13
+      isni: 0000 0001 2331 8773
+      address: College Rd, University College
+      city: Cork
+      country: Ireland
+    - id: macedonia
+      name: Center for Advanced Interdisciplinary Research, University Ss Cyril and Methodius in Skopje
+      ror: https://ror.org/02wk2vx54
+      isni: 0000 0001 0708 5391
+      address:  Boulevard Goce Delchev 9
+      city: Skopje
+      country: North Macedonia
+      postal_code: 1000
+    - id: stanfordmed
+      institution: Stanford University
+      department: Health Research and Policy
+      ror: https://ror.org/03mtd9a03
+      city: Palo Alto
+      region: California
+  keywords:
+    - interactive dashboard
+    - metascience
+    - bibliometrics
+  toc:
+  - file: paper.md
+  - file: content/figure_1.ipynb
+    execution_order: 0
+  - file: content/figure_2.ipynb
+    execution_order: 1
+  - file: content/figure_3.ipynb
+    execution_order: 1
+    
+  github: https://github.com/agahkarakuzu/twopercenters
+  banner: featured.jpg
+  venue: Neurolibre #Production will override this.
+  subject: Living Preprint # Production will override this.
+  numbering:
+    headings: true
+  doi: 10.55458/neurolibre.xxxxx # Production will override this.
+  open_access: true
+  license:
+    content: CC-BY-4.0
+    code: MIT
+  abbreviations:
+    MyST: Markedly Structured Markdown
+    AI: Artificial Intelligence
+  bibliography:
+    - paper.bib
+  resources:
+    - content/figure1.ipynb
+    - content/figure2.ipynb
+site:
+  template: article-theme # Or book-theme
+  options:
+    favicon: static/favicon.ico
+    logo: static/logo.png
+    twitter: neurolibre
+
+data:
+  src: "https://github.com/SIMEXP/Repo2Data/archive/master.tar.gz"
+  dst: "./data"
+  projectName: "repo2data_gzip"
+  recursive: true

@@ -1,0 +1,15 @@
+# Example: Multiple downloads in a single configuration
+# YAML format with 'data' field containing multiple datasets
+
+data:
+  authors:
+    src: "https://github.com/tensorflow/tensorflow/blob/master/AUTHORS"
+    dst: "/DATA"
+    projectName: "repo2data_multiple1"
+    recursive: true
+
+  license:
+    src: "https://github.com/tensorflow/tensorflow/blob/master/LICENSE"
+    dst: "/DATA"
+    projectName: "repo2data_multiple2"
+    recursive: true

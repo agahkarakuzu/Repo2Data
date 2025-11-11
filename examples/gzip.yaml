@@ -1,0 +1,8 @@
+# Example: Download and extract a gzipped archive
+# YAML format with 'data' field
+
+data:
+  src: "https://github.com/SIMEXP/Repo2Data/archive/master.tar.gz"
+  dst: "./"
+  projectName: "repo2data_gzip"
+  recursive: true
