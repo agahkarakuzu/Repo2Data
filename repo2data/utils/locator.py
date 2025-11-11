@@ -233,8 +233,8 @@ def _extract_project_name(config_path: Path) -> Optional[str]:
     Tries in order:
     1. data.projectName from config file (myst.yml or data_requirement.yaml)
     2. projectName from top-level of data_requirement.json/yaml
-    3. binder/data_requirement.txt in same directory
-    4. Infer from project.github in myst.yml
+    3. binder/data_requirement.* (json, yaml, txt) in same directory
+    4. Infer from project.github in myst.yml (last resort fallback)
 
     Parameters
     ----------
@@ -275,39 +275,77 @@ def _extract_project_name(config_path: Path) -> Optional[str]:
             if project_name:
                 return project_name
 
-            # Strategy 3: Infer from project.github in myst.yml
-            if config_path.name == 'myst.yml' or 'myst' in config_path.name.lower():
-                project_metadata = config.get('project', {})
-                if isinstance(project_metadata, dict):
-                    github_url = project_metadata.get('github', '')
-                    if github_url:
-                        # Extract from GitHub URL pattern
-                        match = re.search(r'github\.com/([^/]+)/([^/\s]+)', github_url)
-                        if match:
-                            username, repo = match.groups()
-                            repo = repo.rstrip('.git')
-                            return f"{username}_{repo}".lower()
-
     except Exception:
         pass
 
-    # Strategy 4: Check binder/data_requirement.txt
+    # Strategy 3: Check binder/data_requirement.* files (before GitHub inference)
     try:
-        binder_req = repo_root / 'binder' / 'data_requirement.txt'
-        if binder_req.exists():
-            with open(binder_req, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        # Try to parse as JSON
-                        try:
-                            req_data = json.loads(line)
-                            if isinstance(req_data, dict):
-                                project_name = req_data.get('projectName')
-                                if project_name:
-                                    return project_name
-                        except json.JSONDecodeError:
-                            pass
+        binder_dir = repo_root / 'binder'
+        if binder_dir.exists():
+            # Check for JSON file
+            binder_json = binder_dir / 'data_requirement.json'
+            if binder_json.exists():
+                try:
+                    with open(binder_json, 'r') as f:
+                        req_data = json.load(f)
+                        if isinstance(req_data, dict):
+                            project_name = req_data.get('projectName')
+                            if project_name:
+                                return project_name
+                except (json.JSONDecodeError, Exception):
+                    pass
+
+            # Check for YAML file
+            binder_yaml = binder_dir / 'data_requirement.yaml'
+            if binder_yaml.exists():
+                try:
+                    with open(binder_yaml, 'r') as f:
+                        req_data = yaml.safe_load(f)
+                        if isinstance(req_data, dict):
+                            project_name = req_data.get('projectName')
+                            if project_name:
+                                return project_name
+                except Exception:
+                    pass
+
+            # Check for TXT file (one JSON per line)
+            binder_txt = binder_dir / 'data_requirement.txt'
+            if binder_txt.exists():
+                try:
+                    with open(binder_txt, 'r') as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                try:
+                                    req_data = json.loads(line)
+                                    if isinstance(req_data, dict):
+                                        project_name = req_data.get('projectName')
+                                        if project_name:
+                                            return project_name
+                                except json.JSONDecodeError:
+                                    pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Strategy 4: Infer from project.github in myst.yml (last resort fallback)
+    try:
+        if config_path.name == 'myst.yml' or 'myst' in config_path.name.lower():
+            if config_path.suffix in ['.yml', '.yaml']:
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    if isinstance(config, dict):
+                        project_metadata = config.get('project', {})
+                        if isinstance(project_metadata, dict):
+                            github_url = project_metadata.get('github', '')
+                            if github_url:
+                                # Extract from GitHub URL pattern
+                                match = re.search(r'github\.com/([^/]+)/([^/\s]+)', github_url)
+                                if match:
+                                    username, repo = match.groups()
+                                    repo = repo.rstrip('.git')
+                                    return f"{username}_{repo}".lower()
     except Exception:
         pass
 
