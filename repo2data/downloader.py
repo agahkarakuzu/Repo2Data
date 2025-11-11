@@ -119,7 +119,16 @@ class DatasetDownloader:
 
         # Default: use dst from config
         if "dst" in self.config:
-            return Path(self.config["dst"]) / project_name
+            dst_path = Path(self.config["dst"])
+
+            # If dst is relative, resolve it relative to the config file location
+            if not dst_path.is_absolute() and self.requirement_path:
+                # Get directory containing the config file
+                config_dir = Path(self.requirement_path).parent
+                # Resolve dst relative to config file location
+                dst_path = (config_dir / dst_path).resolve()
+
+            return dst_path / project_name
 
         # Fallback: current directory
         return Path("./data") / project_name
