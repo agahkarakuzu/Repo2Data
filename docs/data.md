@@ -421,7 +421,8 @@ Repo2Data supports multiple data repositories. Each provider has its own documen
 - **[OSF](./osf.md)** - Open Science Framework projects
 - **[Zenodo](./zenodo.md)** - Research datasets with DOI
 - **[Dataverse](./dataverse.md)** - Dataverse repository network
-- **HTTP/HTTPS** - Generic file downloads
+- **[HTTP/HTTPS](./http.md)** - Generic file downloads from any public URL
+- **[AWS S3](./s3.md)** - Amazon S3 buckets (public and private)
 
 The appropriate provider is automatically selected based on your `src` URL format.
 
@@ -503,5 +504,7 @@ Now that you understand the basics, explore provider-specific documentation:
 - [OSF Provider](./osf.md)
 - [Zenodo Provider](./zenodo.md)
 - [Dataverse Provider](./dataverse.md)
+- [HTTP/HTTPS Provider](./http.md)
+- [AWS S3 Provider](./s3.md)
 
 Each guide includes detailed examples and provider-specific features!
